@@ -8,13 +8,130 @@ import Cocoa
 import objc
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
-    NSWindow, NSView, NSSlider, NSTextField, NSFont,
+    NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
     NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
     NSMenu, NSMenuItem
 )
 from Foundation import NSObject, NSMakeRect
 
 ICON: str = "|‾‾‾|"
+LINAK: str = "linak-controller"
+
+
+class BackgroundProcess:
+    def __init__(self, process):
+        self.process = process
+        self.active = True
+
+    def is_running(self):
+        return self.process.poll() is None
+
+    def stop(self):
+        if self.is_running():
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+        self.active = False
+
+
+class ProcessManager:
+    def __init__(self, command, timeout=2.0):
+        self.command = command
+        self.timeout = timeout
+        self.process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        self.output_queue = queue.Queue()
+        self.reader_thread = threading.Thread(target=self._read_output, daemon=True)
+        self.reader_thread.start()
+
+    def _read_output(self):
+        try:
+            for line in self.process.stdout:
+                self.output_queue.put(line.rstrip())
+        except Exception as e:
+            self.output_queue.put(f"[Error reading output: {e}]")
+
+    def execute(self, command):
+        if self.process.poll() is not None:
+            raise RuntimeError("Process has terminated")
+
+        try:
+            self.process.stdin.write(command + "\n")
+            self.process.stdin.flush()
+        except BrokenPipeError:
+            raise RuntimeError("Process has terminated")
+
+        # Collect all output until timeout
+        output = []
+        start_time = time.time()
+
+        while time.time() - start_time < self.timeout:
+            try:
+                line = self.output_queue.get(timeout=0.1)
+                output.append(line)
+                start_time = time.time()  # Reset timer on new output
+            except queue.Empty:
+                pass
+
+        return output
+
+    def execute_background(self, command):
+        cmd_list = command.split() if isinstance(command, str) else command
+
+        bg_process = subprocess.Popen(
+            cmd_list,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True
+        )
+
+        return BackgroundProcess(bg_process)
+
+    def close(self):
+        try:
+            self.process.terminate()
+            self.process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    @staticmethod
+    def start_background_server(command):
+        cmd_list = command.split() if isinstance(command, str) else command
+
+        bg_process = subprocess.Popen(
+            cmd_list,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True
+        )
+        return BackgroundProcess(bg_process)
+
+
+class CustomSliderCell(NSSliderCell):
+    def stopTracking_at_inView_mouseIsUp_(self, last_point, stop_point, view, mouse_is_up):
+        objc.super(CustomSliderCell, self).stopTracking_at_inView_mouseIsUp_(last_point, stop_point, view, mouse_is_up)
+        if mouse_is_up:
+            target = view.target()
+            if target and hasattr(target, "sliderReleased_"):
+                target.sliderReleased_(view)
 
 
 class SliderView(NSView):
@@ -36,6 +153,8 @@ class SliderView(NSView):
         self.slider = NSSlider.alloc().initWithFrame_(
             NSMakeRect(20, 58, 320, 25)
         )
+        custom_cell = CustomSliderCell.alloc().init()
+        self.slider.setCell_(custom_cell)
         self.slider.setMinValue_(63)
         self.slider.setMaxValue_(127)
         self.slider.setDoubleValue_(70)
@@ -80,17 +199,21 @@ class SliderView(NSView):
 
     def sliderChanged_(self, sender):
         value = round(sender.doubleValue())
-
         # Update menubar title dynamically
         if hasattr(self, "app") and self.app :
             self.app.status_item.button().setTitle_(ICON + "  " + str(value) + "cm")
+
+    def sliderReleased_(self, sender):
+        value = round(self.slider.doubleValue())
+        cmd: str = LINAK + " --forward --move-to " + str(value * 10)
+        with ProcessManager(['bash']) as pm:
+            pm.execute(cmd)
 
     def quitApp_(self, sender):
         Cocoa.NSApp.terminate_(None)
 
 
 class MenuBarApp(NSObject):
-
     def init(self):
         self = objc.super(MenuBarApp, self).init()
         if self is None:
@@ -106,6 +229,9 @@ class MenuBarApp(NSObject):
         self.status_item.button().setTitle_(ICON)
         self.status_item.button().setTarget_(self)
         self.status_item.button().setAction_("togglePopover:")
+
+        # Start linak-controller server
+        self.server = ProcessManager.start_background_server(LINAK + " --server")
 
         # Create popover window
         self.popover_window = None
