@@ -1,4 +1,3 @@
-import subprocess
 import queue
 import subprocess
 import threading
@@ -147,7 +146,6 @@ class SliderView(NSView):
 
         return self
 
-
     def buildUI(self):
         # Slider
         self.slider = NSSlider.alloc().initWithFrame_(
@@ -200,7 +198,7 @@ class SliderView(NSView):
     def sliderChanged_(self, sender):
         value = round(sender.doubleValue())
         # Update menubar title dynamically
-        if hasattr(self, "app") and self.app :
+        if hasattr(self, "app") and self.app:
             self.app.status_item.button().setTitle_(ICON + "  " + str(value) + "cm")
 
     def sliderReleased_(self, sender):
@@ -210,6 +208,10 @@ class SliderView(NSView):
             pm.execute(cmd)
 
     def quitApp_(self, sender):
+        if hasattr(self, "app") and hasattr(self.app, "server"):
+            server = self.app.server
+            if server and server.is_running():
+                server.stop()
         Cocoa.NSApp.terminate_(None)
 
 
