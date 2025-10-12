@@ -1,54 +1,53 @@
+import subprocess
+import queue
+import subprocess
+import threading
+import time
+
 import Cocoa
 import objc
-from Foundation import NSObject, NSMakeRect
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSWindow, NSView, NSSlider, NSTextField, NSFont,
     NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
     NSMenu, NSMenuItem
 )
+from Foundation import NSObject, NSMakeRect
+
+ICON: str = "|‾‾‾|"
 
 
 class SliderView(NSView):
-    """Custom view containing the slider and labels"""
-
-    def init(self):
+    def initWithApp_(self, app):
         self = objc.super(SliderView, self).init()
         if self is None:
             return None
 
+        self.app = app  # store reference to MenuBarApp
         frame = NSMakeRect(0, 0, 360, 100)
         self = self.initWithFrame_(frame)
+        self.buildUI()
 
-        # Height label
-        self.height_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 60, 320, 24)
-        )
-        self.height_label.setStringValue_("Height: 1.54m")
-        self.height_label.setBezeled_(False)
-        self.height_label.setDrawsBackground_(False)
-        self.height_label.setEditable_(False)
-        self.height_label.setSelectable_(False)
-        self.height_label.setTextColor_(NSColor.whiteColor())
-        self.height_label.setFont_(NSFont.systemFontOfSize_(14))
-        self.addSubview_(self.height_label)
+        return self
 
+
+    def buildUI(self):
         # Slider
         self.slider = NSSlider.alloc().initWithFrame_(
-            NSMakeRect(20, 30, 320, 25)
+            NSMakeRect(20, 58, 320, 25)
         )
-        self.slider.setMinValue_(0.5)
-        self.slider.setMaxValue_(2.5)
-        self.slider.setDoubleValue_(1.54)
+        self.slider.setMinValue_(63)
+        self.slider.setMaxValue_(127)
+        self.slider.setDoubleValue_(70)
         self.slider.setTarget_(self)
         self.slider.setAction_("sliderChanged:")
         self.addSubview_(self.slider)
 
         # Min label
         min_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 8, 50, 16)
+            NSMakeRect(20, 38, 50, 16)
         )
-        min_label.setStringValue_("0.5m")
+        min_label.setStringValue_("60cm")
         min_label.setBezeled_(False)
         min_label.setDrawsBackground_(False)
         min_label.setEditable_(False)
@@ -59,9 +58,9 @@ class SliderView(NSView):
 
         # Max label
         max_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(290, 8, 50, 16)
+            NSMakeRect(290, 38, 50, 16)
         )
-        max_label.setStringValue_("2.5m")
+        max_label.setStringValue_("130cm")
         max_label.setBezeled_(False)
         max_label.setDrawsBackground_(False)
         max_label.setEditable_(False)
@@ -72,25 +71,25 @@ class SliderView(NSView):
         self.addSubview_(max_label)
 
         # Quit button
-        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(280, 60, 60, 26))
+        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(290, 5, 60, 26))
         quit_button.setTitle_("Quit")
         quit_button.setBezelStyle_(1)  # Rounded
         quit_button.setTarget_(self)
         quit_button.setAction_("quitApp:")
         self.addSubview_(quit_button)
 
-        return self
-
     def sliderChanged_(self, sender):
-        value = sender.doubleValue()
-        self.height_label.setStringValue_(f"Height: {value:.2f}m")
+        value = round(sender.doubleValue())
+
+        # Update menubar title dynamically
+        if hasattr(self, "app") and self.app :
+            self.app.status_item.button().setTitle_(ICON + "  " + str(value) + "cm")
 
     def quitApp_(self, sender):
         Cocoa.NSApp.terminate_(None)
 
 
 class MenuBarApp(NSObject):
-    """Main menu bar application"""
 
     def init(self):
         self = objc.super(MenuBarApp, self).init()
@@ -104,7 +103,7 @@ class MenuBarApp(NSObject):
         )
 
         # Set icon/title
-        self.status_item.button().setTitle_("📏")
+        self.status_item.button().setTitle_(ICON)
         self.status_item.button().setTarget_(self)
         self.status_item.button().setAction_("togglePopover:")
 
@@ -122,7 +121,6 @@ class MenuBarApp(NSObject):
 
     def showPopover(self):
         if self.popover_window is None:
-            # Create window
             rect = NSMakeRect(0, 0, 360, 100)
             self.popover_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
                 rect,
@@ -131,19 +129,16 @@ class MenuBarApp(NSObject):
                 False
             )
 
-            # Configure window
             self.popover_window.setBackgroundColor_(
                 NSColor.colorWithCalibratedRed_green_blue_alpha_(0.18, 0.18, 0.18, 0.95)
             )
             self.popover_window.setOpaque_(False)
             self.popover_window.setLevel_(3)  # Floating window level
 
-            # Add rounded corners
             self.popover_window.contentView().setWantsLayer_(True)
             self.popover_window.contentView().layer().setCornerRadius_(8)
 
-            # Create and add slider view
-            slider_view = SliderView.alloc().init()
+            slider_view = SliderView.alloc().initWithApp_(self)
             self.popover_window.setContentView_(slider_view)
 
         # Position window below status item
@@ -174,7 +169,7 @@ class MenuBarApp(NSObject):
                 self.monitor = None
 
     def clickedOutside_(self, event):
-        # Check if click was outside our window
+        # Check if click was outside window
         if self.popover_window:
             point = Cocoa.NSEvent.mouseLocation()
             frame = self.popover_window.frame()
@@ -184,18 +179,7 @@ class MenuBarApp(NSObject):
 
 def main():
     app = NSApplication.sharedApplication()
-
-    # Create menu bar app
     menu_app = MenuBarApp.alloc().init()
-
-    # Add a quit menu as fallback (right-click or Option+click)
-    menu = NSMenu.alloc().init()
-    quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-        "Quit", "terminate:", "q"
-    )
-    menu.addItem_(quit_item)
-
-    # Run app
     app.run()
 
 
