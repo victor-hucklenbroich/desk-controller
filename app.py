@@ -189,7 +189,7 @@ class PopoverContentView(NSView):
         min_label.setDrawsBackground_(False)
         min_label.setEditable_(False)
         min_label.setSelectable_(False)
-        min_label.setTextColor_(NSColor.grayColor())
+        min_label.setTextColor_(NSColor.whiteColor())
         min_label.setFont_(NSFont.systemFontOfSize_(11))
         self.addSubview_(min_label)
 
@@ -202,7 +202,7 @@ class PopoverContentView(NSView):
         max_label.setDrawsBackground_(False)
         max_label.setEditable_(False)
         max_label.setSelectable_(False)
-        max_label.setTextColor_(NSColor.grayColor())
+        max_label.setTextColor_(NSColor.whiteColor())
         max_label.setFont_(NSFont.systemFontOfSize_(11))
         max_label.setAlignment_(2)
         self.addSubview_(max_label)
@@ -216,11 +216,25 @@ class PopoverContentView(NSView):
         self.addSubview_(quit_button)
 
     def drawRect_(self, rect):
-        path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-            rect, 18, 18
-        )
-        NSColor.colorWithCalibratedRed_green_blue_alpha_(0.18, 0.18, 0.18, 0.95).setFill()
-        path.fill()
+        try:
+            outer_radius = 18.0
+            outer_path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, outer_radius, outer_radius)
+
+            bright = NSColor.colorWithCalibratedWhite_alpha_(0.95, 0.5)
+            bright.set()
+            outer_path.setLineWidth_(0.5)
+            outer_path.stroke()
+
+            inset_amount = 0.8
+            inner_rect = Cocoa.NSInsetRect(rect, inset_amount, inset_amount)
+            inner_radius = max(outer_radius - inset_amount, 7.0)
+            inner_path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(inner_rect, inner_radius, inner_radius)
+
+            NSColor.colorWithCalibratedRed_green_blue_alpha_(0.1, 0.1, 0.12, 0.9).setFill()
+            inner_path.stroke()
+            inner_path.fill()
+        except Exception as e:
+            logger.exception("drawRect_ failed: %s", e)
 
     def sliderChanged_(self, sender):
         value = round(sender.doubleValue())
