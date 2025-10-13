@@ -9,7 +9,7 @@ from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
     NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
-    NSMenu, NSMenuItem
+    NSMenu, NSMenuItem, NSBezierPath
 )
 from Foundation import NSObject, NSMakeRect
 
@@ -133,15 +133,17 @@ class CustomSliderCell(NSSliderCell):
                 target.sliderReleased_(view)
 
 
-class SliderView(NSView):
+class PopoverContentView(NSView):
     def initWithApp_(self, app):
-        self = objc.super(SliderView, self).init()
+        self = objc.super(PopoverContentView, self).init()
         if self is None:
             return None
 
-        self.app = app  # store reference to MenuBarApp
+        self.app = app
         frame = NSMakeRect(0, 0, 360, 100)
         self = self.initWithFrame_(frame)
+        self.setWantsLayer_(True)
+        self.layer().setCornerRadius_(12)
         self.buildUI()
 
         return self
@@ -194,6 +196,14 @@ class SliderView(NSView):
         quit_button.setTarget_(self)
         quit_button.setAction_("quitApp:")
         self.addSubview_(quit_button)
+
+    def drawRect_(self, rect):
+        # Rounded popover window
+        path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+            rect, 18, 18
+        )
+        NSColor.colorWithCalibratedRed_green_blue_alpha_(0.18, 0.18, 0.18, 0.95).setFill()
+        path.fill()
 
     def sliderChanged_(self, sender):
         value = round(sender.doubleValue())
@@ -257,17 +267,12 @@ class MenuBarApp(NSObject):
                 False
             )
 
-            self.popover_window.setBackgroundColor_(
-                NSColor.colorWithCalibratedRed_green_blue_alpha_(0.18, 0.18, 0.18, 0.95)
-            )
             self.popover_window.setOpaque_(False)
-            self.popover_window.setLevel_(3)  # Floating window level
+            self.popover_window.setBackgroundColor_(NSColor.clearColor())
+            self.popover_window.setLevel_(3)
 
-            self.popover_window.contentView().setWantsLayer_(True)
-            self.popover_window.contentView().layer().setCornerRadius_(8)
-
-            slider_view = SliderView.alloc().initWithApp_(self)
-            self.popover_window.setContentView_(slider_view)
+            content_view = PopoverContentView.alloc().initWithApp_(self)
+            self.popover_window.setContentView_(content_view)
 
         # Position window below status item
         button_frame = self.status_item.button().window().frame()
