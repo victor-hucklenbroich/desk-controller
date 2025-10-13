@@ -2,6 +2,8 @@ import queue
 import subprocess
 import threading
 import time
+import logging
+import os
 
 import Cocoa
 import objc
@@ -13,14 +15,29 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
+# Set up logging to file
+log_dir = os.path.expanduser("~/Library/Logs")
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "DeskController.log")
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 ICON: str = "|‾‾‾|"
-LINAK: str = "linak-controller"
+LINAK: str = "/opt/homebrew/anaconda3/bin/linak-controller"
 
 
 class BackgroundProcess:
     def __init__(self, process):
         self.process = process
         self.active = True
+        logger.info(f"BackgroundProcess created with PID: {process.pid}")
 
     def is_running(self):
         return self.process.poll() is None
@@ -57,6 +74,7 @@ class ProcessManager:
             for line in self.process.stdout:
                 self.output_queue.put(line.rstrip())
         except Exception as e:
+            logger.error(f"Error reading output: {e}")
             self.output_queue.put(f"[Error reading output: {e}]")
 
     def execute(self, command):
@@ -77,7 +95,7 @@ class ProcessManager:
             try:
                 line = self.output_queue.get(timeout=0.1)
                 output.append(line)
-                start_time = time.time()  # Reset timer on new output
+                start_time = time.time()
             except queue.Empty:
                 pass
 
@@ -186,19 +204,18 @@ class PopoverContentView(NSView):
         max_label.setSelectable_(False)
         max_label.setTextColor_(NSColor.grayColor())
         max_label.setFont_(NSFont.systemFontOfSize_(11))
-        max_label.setAlignment_(2)  # Right align
+        max_label.setAlignment_(2)
         self.addSubview_(max_label)
 
         # Quit button
         quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(290, 5, 60, 26))
         quit_button.setTitle_("Quit")
-        quit_button.setBezelStyle_(1)  # Rounded
+        quit_button.setBezelStyle_(1)
         quit_button.setTarget_(self)
         quit_button.setAction_("quitApp:")
         self.addSubview_(quit_button)
 
     def drawRect_(self, rect):
-        # Rounded popover window
         path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
             rect, 18, 18
         )
@@ -207,17 +224,22 @@ class PopoverContentView(NSView):
 
     def sliderChanged_(self, sender):
         value = round(sender.doubleValue())
-        # Update menubar title dynamically
         if hasattr(self, "app") and self.app:
             self.app.status_item.button().setTitle_(ICON + "  " + str(value) + "cm")
 
     def sliderReleased_(self, sender):
         value = round(self.slider.doubleValue())
         cmd: str = LINAK + " --forward --move-to " + str(value * 10)
-        with ProcessManager(['bash']) as pm:
-            pm.execute(cmd)
+        logger.info(f"Executing command: {cmd}")
+        try:
+            with ProcessManager(['bash']) as pm:
+                result = pm.execute(cmd)
+                logger.info(f"Command result: {result}")
+        except Exception as e:
+            logger.error(f"Error executing command: {e}")
 
     def quitApp_(self, sender):
+        logger.info("Quit button pressed")
         if hasattr(self, "app") and hasattr(self.app, "server"):
             server = self.app.server
             if server and server.is_running():
@@ -227,27 +249,37 @@ class PopoverContentView(NSView):
 
 class MenuBarApp(NSObject):
     def init(self):
+        logger.info("Initializing MenuBarApp")
         self = objc.super(MenuBarApp, self).init()
         if self is None:
             return None
 
-        # Create status bar item
-        self.status_bar = NSStatusBar.systemStatusBar()
-        self.status_item = self.status_bar.statusItemWithLength_(
-            NSVariableStatusItemLength
-        )
+        try:
+            # Create status bar item
+            self.status_bar = NSStatusBar.systemStatusBar()
+            self.status_item = self.status_bar.statusItemWithLength_(
+                NSVariableStatusItemLength
+            )
 
-        # Set icon/title
-        self.status_item.button().setTitle_(ICON)
-        self.status_item.button().setTarget_(self)
-        self.status_item.button().setAction_("togglePopover:")
+            # Set icon/title
+            self.status_item.button().setTitle_(ICON)
+            self.status_item.button().setTarget_(self)
+            self.status_item.button().setAction_("togglePopover:")
 
-        # Start linak-controller server
-        self.server = ProcessManager.start_background_server(LINAK + " --server")
+            logger.info("Status bar item created")
 
-        # Create popover window
-        self.popover_window = None
-        self.is_visible = False
+            # Start linak-controller server
+            logger.info("Starting linak-controller server")
+            self.server = ProcessManager.start_background_server(LINAK + " --server")
+            logger.info(f"Server started, running: {self.server.is_running()}")
+
+            # Create popover window
+            self.popover_window = None
+            self.is_visible = False
+
+            logger.info("MenuBarApp initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing MenuBarApp: {e}", exc_info=True)
 
         return self
 
@@ -274,7 +306,6 @@ class MenuBarApp(NSObject):
             content_view = PopoverContentView.alloc().initWithApp_(self)
             self.popover_window.setContentView_(content_view)
 
-        # Position window below status item
         button_frame = self.status_item.button().window().frame()
         window_frame = self.popover_window.frame()
 
@@ -286,7 +317,6 @@ class MenuBarApp(NSObject):
 
         self.is_visible = True
 
-        # Monitor clicks outside window to close it
         NSEvent = Cocoa.NSEvent
         mask = Cocoa.NSEventMaskLeftMouseDown | Cocoa.NSEventMaskRightMouseDown
         self.monitor = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
@@ -302,7 +332,6 @@ class MenuBarApp(NSObject):
                 self.monitor = None
 
     def clickedOutside_(self, event):
-        # Check if click was outside window
         if self.popover_window:
             point = Cocoa.NSEvent.mouseLocation()
             frame = self.popover_window.frame()
@@ -311,8 +340,10 @@ class MenuBarApp(NSObject):
 
 
 def main():
+    logger.info("Starting application")
     app = NSApplication.sharedApplication()
     menu_app = MenuBarApp.alloc().init()
+    logger.info("Entering app.run()")
     app.run()
 
 
