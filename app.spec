@@ -1,7 +1,7 @@
 # app.spec
-a = Analysis(
-    ['app.py'],
-    pathex=[],
+analysis = Analysis(
+    ['desk_controller/__main__.py'],
+    pathex=['desk_controller'],
     binaries=[],
     datas=[],
     hiddenimports=['objc', 'Cocoa', 'AppKit', 'Foundation', 'linak-controller'],
@@ -12,14 +12,14 @@ a = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+pyz = PYZ(analysis.pure, analysis.zipped_data, cipher=None)
 
 exe = EXE(
     pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    analysis.scripts,
+    analysis.binaries,
+    analysis.zipfiles,
+    analysis.datas,
     [],
     name='DeskController',
     debug=False,
@@ -28,7 +28,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # This hides the console window
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=True,
     target_arch=None,

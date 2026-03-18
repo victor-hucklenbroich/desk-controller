@@ -1,10 +1,5 @@
-import queue
-import subprocess
 import threading
 import time
-import logging
-import os
-
 import Cocoa
 import objc
 from AppKit import (
@@ -15,169 +10,12 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
-# --- Logging Configuration ---
-log_dir = os.path.expanduser("~/Library/Logs")
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "DeskController.log")
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# --- Constants ---
-ICON: str = "|‾‾‾|"
-VERSION: str = "1.0.0"
-LINAK: str = "/opt/homebrew/anaconda3/bin/linak-controller"
-MOVE_CMD: str = LINAK + " --forward --move-to "
+from process import Controller
+from constants import LOGGER
+import constants
 
 
-class BackgroundProcess:
-    """
-    A wrapper around a subprocess.Popen object to manage its lifecycle
-    and provide a clean way to terminate background tasks like the server.
-    """
-
-    def __init__(self, process):
-        self.process = process
-        self.active = True
-        logger.info(f"BackgroundProcess created with PID: {process.pid}")
-
-    def is_running(self):
-        """Checks if the process is still active."""
-        return self.process.poll() is None
-
-    def stop(self):
-        """Gracefully terminates the process, falling back to kill if necessary."""
-        if self.is_running():
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-        self.active = False
-
-
-class ProcessManager:
-    """
-    Handles communication with shell processes. Uses a dedicated reader thread
-    to prevent the application from hanging while waiting for command output.
-    """
-
-    def __init__(self, command, timeout=2.0):
-        self.command = command
-        self.timeout = timeout
-        self.process = subprocess.Popen(
-            command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-        self.output_queue = queue.Queue()
-        # Thread to drain stdout and prevent buffer bloat
-        self.reader_thread = threading.Thread(target=self._read_output, daemon=True)
-        self.reader_thread.start()
-
-    def _read_output(self):
-        """Continuously reads lines from the process stdout and puts them in a queue."""
-        try:
-            for line in self.process.stdout:
-                self.output_queue.put(line.rstrip())
-        except Exception as e:
-            logger.error(f"Error reading output: {e}")
-            self.output_queue.put(f"[Error reading output: {e}]")
-
-    def send(self, command):
-        """Sends a string command to the process stdin and waits for output until timeout."""
-        if self.process.poll() is not None:
-            raise RuntimeError("Process has terminated")
-
-        try:
-            self.process.stdin.write(command + "\n")
-            self.process.stdin.flush()
-        except BrokenPipeError:
-            raise RuntimeError("Process has terminated")
-
-        output = []
-        start_time = time.time()
-
-        # Gather output lines until the queue is empty or timeout is reached
-        while time.time() - start_time < self.timeout:
-            try:
-                line = self.output_queue.get(timeout=0.1)
-                output.append(line)
-                start_time = time.time()
-            except queue.Empty:
-                pass
-
-        return output
-
-    def execute_background(self, command):
-        """Starts a process in the background without waiting for its completion."""
-        cmd_list = command.split() if isinstance(command, str) else command
-
-        bg_process = subprocess.Popen(
-            cmd_list,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True
-        )
-
-        return BackgroundProcess(bg_process)
-
-    def close(self):
-        """Closes process pipes and terminates the process."""
-        try:
-            self.process.terminate()
-            self.process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    @staticmethod
-    def start_background_server(command):
-        """Static helper to initialize the linak-controller server process."""
-        cmd_list = command.split() if isinstance(command, str) else command
-
-        bg_process = subprocess.Popen(
-            cmd_list,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True
-        )
-        return BackgroundProcess(bg_process)
-
-    @staticmethod
-    def execute(cmd: str):
-        """
-        Static helper to run a one-off command through a bash shell.
-        Logs the result and handles exceptions.
-        """
-        logger.info(f"Executing command: {cmd}")
-        try:
-            with ProcessManager(['bash']) as pm:
-                result = pm.send(cmd)
-                logger.info(f"Command result: {result}")
-        except Exception as e:
-            logger.error(f"Error executing command: {e}")
-
-
-class CustomSliderCell(NSSliderCell):
+class SliderCell(NSSliderCell):
     """
     Subclass of NSSliderCell to capture the 'mouse up' event on the slider.
     This allows us to trigger the desk movement only when the user finishes dragging.
@@ -185,9 +23,8 @@ class CustomSliderCell(NSSliderCell):
 
     def stopTracking_at_inView_mouseIsUp_(self, last_point, stop_point, view, mouse_is_up):
         # Call parent implementation to ensure standard slider behavior
-        objc.super(CustomSliderCell, self).stopTracking_at_inView_mouseIsUp_(last_point, stop_point, view, mouse_is_up)
+        objc.super(SliderCell, self).stopTracking_at_inView_mouseIsUp_(last_point, stop_point, view, mouse_is_up)
 
-        # Trigger our custom release action if the mouse was actually released
         if mouse_is_up:
             target = view.target()
             if target and hasattr(target, "sliderReleased_"):
@@ -221,7 +58,7 @@ class PopoverContentView(NSView):
         self.slider = NSSlider.alloc().initWithFrame_(
             NSMakeRect(22, 64, 320, 25)
         )
-        custom_cell = CustomSliderCell.alloc().init()
+        custom_cell = SliderCell.alloc().init()
         self.slider.setCell_(custom_cell)
         self.slider.setMinValue_(63)
         self.slider.setMaxValue_(127)
@@ -261,7 +98,7 @@ class PopoverContentView(NSView):
         name_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(4, 8, 145, 16)
         )
-        name_label.setStringValue_(f"DeskController {VERSION}")
+        name_label.setStringValue_(f"DeskController {constants.VERSION}")
         name_label.setBezeled_(False)
         name_label.setDrawsBackground_(False)
         name_label.setEditable_(False)
@@ -314,7 +151,7 @@ class PopoverContentView(NSView):
             inner_path.stroke()
             inner_path.fill()
         except Exception as e:
-            logger.exception("drawRect_ failed: %s", e)
+            LOGGER.exception("drawRect_ failed: %s", e)
 
     @objc.python_method
     def startTransition_(self, target_value, move_slider_handle=False):
@@ -331,12 +168,10 @@ class PopoverContentView(NSView):
             # Disable interaction on the main thread
             self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", False, True)
 
-            # Start physical desk movement immediately
-            cmd = MOVE_CMD + str(target_value * 10)
-            desk_thread = threading.Thread(target=ProcessManager.execute, args=(cmd,), daemon=True)
+            cmd = constants.MOVE_CMD + str(target_value * 10)
+            desk_thread = threading.Thread(target=Controller.execute, args=(cmd,), daemon=True)
             desk_thread.start()
 
-            # Buffer for linak-controller to initialize and desk to begin moving
             time.sleep(1.5)
 
             # Visual animation loop
@@ -351,7 +186,6 @@ class PopoverContentView(NSView):
                 self.performSelectorOnMainThread_withObject_waitUntilDone_("syncTransitionUI:", update_data, False)
                 time.sleep(0.25)  # Speed of visual height updates
 
-            # Wait for the shell process to actually finish before re-enabling UI
             desk_thread.join()
 
             self.current_height = target_value
@@ -362,7 +196,7 @@ class PopoverContentView(NSView):
     def syncTransitionUI_(self, data):
         """Objective-C selector to update UI elements on the Main Thread."""
         val = round(data["val"])
-        self.app.status_item.button().setTitle_(f"{ICON}  {val}cm")
+        self.app.status_item.button().setTitle_(f"{constants.ICON}  {val}cm")
         if data["move_slider"]:
             self.slider.setDoubleValue_(val)
 
@@ -383,19 +217,19 @@ class PopoverContentView(NSView):
 
     def shortcutSit_(self, sender):
         """Action for Sit button preset."""
-        logger.info("Sit shortcut button pressed")
+        LOGGER.info("Sit shortcut button pressed")
         target = 75
         self.startTransition_(target, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button preset."""
-        logger.info("Stand shortcut button pressed")
+        LOGGER.info("Stand shortcut button pressed")
         target = 120
         self.startTransition_(target, move_slider_handle=True)
 
     def quitApp_(self, sender):
         """Gracefully shuts down the controller server and exits the application."""
-        logger.info("Quit button pressed")
+        LOGGER.info("Quit button pressed")
         if hasattr(self, "app") and hasattr(self.app, "server"):
             server = self.app.server
             if server and server.is_running():
@@ -410,7 +244,7 @@ class MenuBarApp(NSObject):
     """
 
     def init(self):
-        logger.info("Initializing MenuBarApp")
+        LOGGER.info("Initializing MenuBarApp")
         self = objc.super(MenuBarApp, self).init()
         if self is None:
             return None
@@ -422,23 +256,23 @@ class MenuBarApp(NSObject):
                 NSVariableStatusItemLength
             )
 
-            self.status_item.button().setTitle_(ICON + " 75cm")
+            self.status_item.button().setTitle_(constants.ICON + " 75cm")
             self.status_item.button().setTarget_(self)
             self.status_item.button().setAction_("togglePopover:")
 
-            logger.info("Status bar item created")
+            LOGGER.info("Status bar item created")
 
             # Initialize the background linak-controller server
-            logger.info("Starting linak-controller server")
-            self.server = ProcessManager.start_background_server(LINAK + " --server")
-            logger.info(f"Server started, running: {self.server.is_running()}")
+            LOGGER.info("Starting linak-controller server")
+            self.server = Controller.start_background_server(constants.LINAK + " --server")
+            LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None
             self.is_visible = False
 
-            logger.info("MenuBarApp initialized successfully")
+            LOGGER.info("MenuBarApp initialized successfully")
         except Exception as e:
-            logger.error(f"Error initializing MenuBarApp: {e}", exc_info=True)
+            LOGGER.error(f"Error initializing MenuBarApp: {e}", exc_info=True)
 
         return self
 
@@ -502,16 +336,3 @@ class MenuBarApp(NSObject):
             frame = self.popover_window.frame()
             if not Cocoa.NSPointInRect(point, frame):
                 self.hidePopover()
-
-
-def main():
-    """Main entry point for the application."""
-    logger.info("Starting application")
-    app = NSApplication.sharedApplication()
-    menu_app = MenuBarApp.alloc().init()
-    logger.info("Entering app.run()")
-    app.run()
-
-
-if __name__ == '__main__':
-    main()
