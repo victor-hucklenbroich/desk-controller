@@ -1,6 +1,7 @@
 # DeskController
 
-**Version:** 1.0.0  
+**Version:** v0.1.0-alpha
+
 **Author:** Victor Hucklenbroich
 
 A lightweight macOS menu bar application for controlling Linak-based standing desks. DeskController provides a visual interface for linak-controller interactions, allowing bluetooth desk height control.
@@ -58,7 +59,7 @@ This application is built on top of [linak-controller](https://github.com/rhyst/
    - Drag the slider to your desired height and release
    - Click "Sit" for 75cm preset
    - Click "Stand" for 120cm preset
-3. **Monitor**: Current desk height is displayed in the menu bar (e.g., `|‾‾‾| 75cm`)
+3. **Monitor**: Current desk height is displayed in the menu bar (e.g., ![image](./assets/example.png))
 4. **Quit**: Click the "Quit" button in the popover
 
 ## Configuration
