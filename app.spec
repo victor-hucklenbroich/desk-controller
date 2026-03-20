@@ -1,4 +1,3 @@
-# app.spec
 analysis = Analysis(
     ['desk_controller/__main__.py'],
     pathex=['desk_controller'],
@@ -17,10 +16,7 @@ pyz = PYZ(analysis.pure, analysis.zipped_data, cipher=None)
 exe = EXE(
     pyz,
     analysis.scripts,
-    analysis.binaries,
-    analysis.zipfiles,
-    analysis.datas,
-    [],
+    exclude_binaries=True,
     name='DeskController',
     debug=False,
     bootloader_ignore_signals=False,
@@ -36,8 +32,19 @@ exe = EXE(
     entitlements_file=None,
 )
 
-app = BUNDLE(
+collect = COLLECT(
     exe,
+    analysis.binaries,
+    analysis.zipfiles,
+    analysis.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='DeskController',
+)
+
+app = BUNDLE(
+    collect,
     name='DeskController.app',
     icon='assets/app_icon.icns',
     bundle_identifier='com.victorhucklenbroich.DeskController',
