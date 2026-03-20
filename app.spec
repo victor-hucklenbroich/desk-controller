@@ -3,12 +3,12 @@ analysis = Analysis(
     ['desk_controller/__main__.py'],
     pathex=['desk_controller'],
     binaries=[],
-    datas=[],
-    hiddenimports=['objc', 'Cocoa', 'AppKit', 'Foundation', 'linak-controller'],
+    datas=[('assets', 'assets')],
+    hiddenimports=['objc', 'Cocoa', 'AppKit', 'Foundation'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludedimports=[],
+    excludes=[],
     noarchive=False,
 )
 
@@ -30,7 +30,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
-    argv_emulation=True,
+    argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
@@ -39,7 +39,7 @@ exe = EXE(
 app = BUNDLE(
     exe,
     name='DeskController.app',
-    icon=None,
+    icon='assets/app_icon.icns',
     bundle_identifier='com.victorhucklenbroich.DeskController',
     info_plist={
         'NSPrincipalClass': 'NSApplication',

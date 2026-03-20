@@ -1,16 +1,24 @@
-from constants import LOGGER
-from ui import MenuBarApp
-from AppKit import NSApplication
+import os
+import traceback
 
 
-def main():
-    """Main entry point for the application."""
-    LOGGER.info("Starting application")
-    app = NSApplication.sharedApplication()
-    menu_app = MenuBarApp.alloc().init()
-    LOGGER.info("Entering app.run()")
-    app.run()
+_fallback_log = os.path.expanduser("~/Library/Logs/DeskController_error.log")
 
+try:
+    from AppKit import NSApplication
 
-if __name__ == '__main__':
-    main()
+    def main():
+        # init AppKit runtime before importing dependent modules
+        app = NSApplication.sharedApplication()
+        from constants import LOGGER
+        from ui import MenuBarApp
+        LOGGER.info("Starting application")
+        menu_app = MenuBarApp.alloc().init()
+        app.run()
+
+    if __name__ == '__main__':
+        main()
+
+except Exception:
+    with open(_fallback_log, "w") as f:
+        f.write(traceback.format_exc())

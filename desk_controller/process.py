@@ -52,7 +52,7 @@ class BackgroundProcess:
         return self.process.poll() is None
 
     def stop(self):
-        """Gracefully terminates the process, falling back to kill if necessary."""
+        """Terminates the process, falling back to kill if necessary."""
         if self.is_running():
             self.process.terminate()
             try:

@@ -6,7 +6,8 @@ from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
     NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
-    NSMenu, NSMenuItem, NSBezierPath
+    NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
+    NSAttributedString, NSFontAttributeName
 )
 from Foundation import NSObject, NSMakeRect
 
@@ -17,8 +18,7 @@ import constants
 
 class SliderCell(NSSliderCell):
     """
-    Subclass of NSSliderCell to capture the 'mouse up' event on the slider.
-    This allows us to trigger the desk movement only when the user finishes dragging.
+    Subclass of NSSliderCell to capture the mouse release event on the slider.
     """
 
     def stopTracking_at_inView_mouseIsUp_(self, last_point, stop_point, view, mouse_is_up):
@@ -43,7 +43,7 @@ class PopoverContentView(NSView):
             return None
 
         self.app = app
-        self.current_height = 75  # Tracks current desk state for animation logic
+        self.current_height = 75  # current desk state for animation logic
         frame = NSMakeRect(0, 0, 364, 120)
         self = self.initWithFrame_(frame)
         self.setWantsLayer_(True)
@@ -54,14 +54,13 @@ class PopoverContentView(NSView):
 
     def buildUI(self):
         """Initializes and positions all UI elements within the popover."""
-        # Slider for manual height selection
         self.slider = NSSlider.alloc().initWithFrame_(
             NSMakeRect(22, 64, 320, 25)
         )
         custom_cell = SliderCell.alloc().init()
         self.slider.setCell_(custom_cell)
-        self.slider.setMinValue_(63)
-        self.slider.setMaxValue_(127)
+        self.slider.setMinValue_(constants.MIN_HEIGHT)
+        self.slider.setMaxValue_(constants.MAX_HEIGHT)
         self.slider.setDoubleValue_(75)
         self.slider.setTarget_(self)
         self.slider.setAction_("sliderChanged:")
@@ -153,14 +152,33 @@ class PopoverContentView(NSView):
         except Exception as e:
             LOGGER.exception("drawRect_ failed: %s", e)
 
+    @staticmethod
+    @objc.python_method
+    def updateUI(status_item, slider, height_value, move_slider_handle, ):
+        """Function to update all dynamic UI elements."""
+        # height display update
+        attr_title = NSAttributedString.alloc().initWithString_attributes_(
+            f"{height_value:>4}cm", {NSFontAttributeName: constants.MONO_FONT}
+        )
+        status_item.button().setAttributedTitle_(attr_title)
+
+        # icon sprite update
+        normalized = (height_value - constants.MIN_HEIGHT) / (constants.MAX_HEIGHT - constants.MIN_HEIGHT)
+        sprite_index = max(0, min(14, round(normalized * 14)))
+        status_item.button().setImage_(constants.ICON_SPRITES[sprite_index])
+
+        # slider update
+        if move_slider_handle:
+            slider.setDoubleValue_(height_value)
+
     @objc.python_method
     def startTransition_(self, target_value, move_slider_handle=False):
         """
         Coordinates the multi-step desk movement process:
         1. Disables UI to prevent command overlapping.
         2. Dispatches physical move command to a background thread.
-        3. Waits for hardware/comms delay (1.5s).
-        4. Animates the height indicators (menu bar text and optionally slider).
+        3. Waits for hardware/comms delay.
+        4. Animates the height indicators (slider, icon, height display).
         5. Re-enables UI once the physical move is confirmed finished.
         """
 
@@ -196,9 +214,7 @@ class PopoverContentView(NSView):
     def syncTransitionUI_(self, data):
         """Objective-C selector to update UI elements on the Main Thread."""
         val = round(data["val"])
-        self.app.status_item.button().setTitle_(f"{constants.ICON}  {val}cm")
-        if data["move_slider"]:
-            self.slider.setDoubleValue_(val)
+        PopoverContentView.updateUI(self.app.status_item, self.slider, val, data["move_slider"])
 
     def setUIState_(self, enabled):
         """Enables or disables UI elements to prevent user input during transitions."""
@@ -207,7 +223,7 @@ class PopoverContentView(NSView):
         self.stand_button.setEnabled_(enabled)
 
     def sliderChanged_(self, sender):
-        """Action for slider movements (empty, used for live feedback if needed)."""
+        """Action for slider movements (empty, action is triggered upon release)."""
         pass
 
     def sliderReleased_(self, sender):
@@ -216,19 +232,19 @@ class PopoverContentView(NSView):
         self.startTransition_(target, move_slider_handle=False)
 
     def shortcutSit_(self, sender):
-        """Action for Sit button preset."""
+        """Action for Sit button."""
         LOGGER.info("Sit shortcut button pressed")
         target = 75
         self.startTransition_(target, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
-        """Action for Stand button preset."""
+        """Action for Stand button."""
         LOGGER.info("Stand shortcut button pressed")
         target = 120
         self.startTransition_(target, move_slider_handle=True)
 
     def quitApp_(self, sender):
-        """Gracefully shuts down the controller server and exits the application."""
+        """Shuts down the controller server and exits the application."""
         LOGGER.info("Quit button pressed")
         if hasattr(self, "app") and hasattr(self.app, "server"):
             server = self.app.server
@@ -248,21 +264,17 @@ class MenuBarApp(NSObject):
         self = objc.super(MenuBarApp, self).init()
         if self is None:
             return None
-
         try:
-            # Setup the macOS Status Bar Item
             self.status_bar = NSStatusBar.systemStatusBar()
             self.status_item = self.status_bar.statusItemWithLength_(
                 NSVariableStatusItemLength
             )
 
-            self.status_item.button().setTitle_(constants.ICON + " 75cm")
+            PopoverContentView.updateUI(self.status_item, None, 75, False) # initial UI state
             self.status_item.button().setTarget_(self)
             self.status_item.button().setAction_("togglePopover:")
-
             LOGGER.info("Status bar item created")
 
-            # Initialize the background linak-controller server
             LOGGER.info("Starting linak-controller server")
             self.server = Controller.start_background_server(constants.LINAK + " --server")
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
@@ -273,18 +285,17 @@ class MenuBarApp(NSObject):
             LOGGER.info("MenuBarApp initialized successfully")
         except Exception as e:
             LOGGER.error(f"Error initializing MenuBarApp: {e}", exc_info=True)
-
         return self
 
     def togglePopover_(self, sender):
-        """Shows or hides the custom popover window."""
+        """Shows or hides popover window."""
         if self.is_visible:
             self.hidePopover()
         else:
             self.showPopover()
 
     def showPopover(self):
-        """Creates (if necessary) and displays the popover window below the menu bar icon."""
+        """Creates and displays the popover window below the menu bar icon."""
         if self.popover_window is None:
             rect = NSMakeRect(0, 0, 364, 120)
             self.popover_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -296,7 +307,7 @@ class MenuBarApp(NSObject):
 
             self.popover_window.setOpaque_(False)
             self.popover_window.setBackgroundColor_(NSColor.clearColor())
-            self.popover_window.setLevel_(3)  # Ensure it appears above other windows
+            self.popover_window.setLevel_(3)
 
             content_view = PopoverContentView.alloc().initWithApp_(self)
             self.popover_window.setContentView_(content_view)
