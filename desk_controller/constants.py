@@ -18,7 +18,7 @@ LIBRARY_PATH = os.path.expanduser("~/Library/")
 
 
 # --- Logging Configuration ---
-log_dir = os.path.join(LIBARY_PATH, "Logs")
+log_dir = os.path.join(LIBRARY_PATH, "Logs")
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "DeskController.log")
 logging.basicConfig(
@@ -42,11 +42,15 @@ MOVE_CMD: str = LINAK_PATH + " --forward --move-to "
 with open(os.path.join(LIBRARY_PATH, "Application Support/linak-controller/config.yaml")) as stream:
     try:
         CONFIG = yaml.safe_load(stream)
+        CONFIG_SIT: int = CONFIG["favourites"]["sit"]
+        CONFIG_STAND: int = CONFIG["favourites"]["stand"]
     except yaml.YAMLError as e:
-        LOGGER.error(e)
+        CONFIG_SIT: int = 750
+        CONFIG_STAND: int = 1240
+        LOGGER.warning(e)
 
-CONFIG_SIT: int = CONFIG["favourites"]["sit"]
-CONFIG_STAND: int = CONFIG["favourites"]["stand"]
+CONFIG_SIT = int(CONFIG_SIT / 10)
+CONFIG_STAND = int(CONFIG_STAND / 10)
 
 
 # --- UI Constants ---
