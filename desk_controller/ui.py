@@ -11,6 +11,7 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
+from desk_controller.constants import CONFIG_SIT, CONFIG_STAND
 from process import Controller
 from constants import LOGGER
 import constants
@@ -234,14 +235,12 @@ class PopoverContentView(NSView):
     def shortcutSit_(self, sender):
         """Action for Sit button."""
         LOGGER.info("Sit shortcut button pressed")
-        target = 75
-        self.startTransition_(target, move_slider_handle=True)
+        self.startTransition_(CONFIG_SIT, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
         LOGGER.info("Stand shortcut button pressed")
-        target = 120
-        self.startTransition_(target, move_slider_handle=True)
+        self.startTransition_(CONFIG_STAND, move_slider_handle=True)
 
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""
@@ -276,7 +275,7 @@ class MenuBarApp(NSObject):
             LOGGER.info("Status bar item created")
 
             LOGGER.info("Starting linak-controller server")
-            self.server = Controller.start_background_server(constants.LINAK + " --server")
+            self.server = Controller.start_background_server(constants.LINAK_PATH + " --server")
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None
