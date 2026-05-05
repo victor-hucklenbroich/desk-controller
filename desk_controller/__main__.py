@@ -11,7 +11,7 @@ try:
         # init AppKit runtime before importing dependent modules
         app = NSApplication.sharedApplication()
         from constants import LOGGER
-        from ui import MenuBarApp
+        from desk_controller.ui.app import MenuBarApp
         LOGGER.info("Starting application")
         menu_app = MenuBarApp.alloc().init()
         app.run()
