@@ -1,0 +1,13 @@
+#!/bin/bash
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_NAME="DeskController.app"
+
+# Build
+pyinstaller "$REPO_ROOT/app.spec" || exit 1
+
+# Deploy to Applications
+sudo rm -rf "/Applications/$APP_NAME"
+sudo cp -r "$REPO_ROOT/dist/$APP_NAME" "/Applications/"
+
+echo "$APP_NAME has been installed successfully"
