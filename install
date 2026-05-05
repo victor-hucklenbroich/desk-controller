@@ -1,13 +1,180 @@
 #!/bin/bash
 
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="DeskController.app"
+DIST_PATH="$REPO_ROOT/dist/$APP_NAME"
+SPEC_FILE="$REPO_ROOT/app.spec"
+APPS_DIR="/Applications"
+LINAK_PATH="/opt/homebrew/anaconda3/bin/linak-controller"
 
-# Build
-pyinstaller "$REPO_ROOT/app.spec" || exit 1
+# Echo functions
+print_header() {
+    echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
 
-# Deploy to Applications
-sudo rm -rf "/Applications/$APP_NAME"
-sudo cp -r "$REPO_ROOT/dist/$APP_NAME" "/Applications/"
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
 
-echo "$APP_NAME has been installed successfully"
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# Dependency checks
+check_python() {
+    print_info "Checking Python installation..."
+    
+    if ! command -v python3 &> /dev/null; then
+        print_error "Python 3 is not installed"
+        return 1
+    fi
+    
+    PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
+    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+    
+    if [ "$PYTHON_MAJOR" -lt 3 ]; then
+        print_error "Python 3.x required, but found Python $PYTHON_VERSION"
+        return 1
+    fi
+    
+    print_success "Python $PYTHON_VERSION found"
+    return 0
+}
+
+check_homebrew() {
+    print_info "Checking Homebrew installation..."
+    
+    if ! command -v brew &> /dev/null; then
+        print_warning "Homebrew is not installed"
+        read -p "Would you like to install Homebrew now? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Installing Homebrew..."
+            if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+                print_success "Homebrew installed successfully"
+                return 0
+            else
+                print_error "Failed to install Homebrew"
+                return 1
+            fi
+        else
+            print_warning "Homebrew installation skipped"
+            return 1
+        fi
+    fi
+    
+    print_success "Homebrew is installed"
+    return 0
+}
+
+check_linak_controller() {
+    print_info "Checking linak-controller installation..."
+    
+    if [ -f "$LINAK_PATH" ]; then
+        print_success "linak-controller is installed at correct path"
+        return 0
+    fi
+    
+    if ! command -v brew &> /dev/null; then
+        print_error "Homebrew not available, cannot install linak-controller"
+        return 1
+    fi
+    
+    print_info "Installing linak-controller via Homebrew..."
+    if brew install linak-controller; then
+        print_success "linak-controller installed successfully"
+        return 0
+    else
+        print_error "Failed to install linak-controller"
+        return 1
+    fi
+}
+
+check_pyobjc() {
+    print_info "Checking PyObjC installation..."
+    
+    if python3 -c "import objc" 2>/dev/null; then
+        print_success "PyObjC is installed"
+        return 0
+    fi
+    
+    print_warning "PyObjC is not installed, installing now..."
+    if pip3 install pyobjc; then
+        print_success "PyObjC installed successfully"
+        return 0
+    else
+        print_error "Failed to install PyObjC"
+        return 1
+    fi
+}
+
+# Main script
+main() {
+    print_header "Dependency Check"
+    
+    # Track if all checks passed
+    DEPS_OK=true
+    
+    # Run all checks
+    check_python || DEPS_OK=false
+    check_homebrew || print_warning "Some features may not work without Homebrew"
+    check_linak_controller || DEPS_OK=false
+    check_pyobjc || DEPS_OK=false
+    
+    if [ "$DEPS_OK" = false ]; then
+        print_error "Dependency checks failed. Please fix the issues above."
+        exit 1
+    fi
+    
+    print_header "Building App with Pyinstaller and $SPEC_FILE"
+    
+    if pyinstaller "$SPEC_FILE"; then
+        print_success "Build completed successfully"
+    else
+        print_error "Build failed"
+        exit 1
+    fi
+
+    if [ ! -d "$DIST_PATH" ]; then
+        print_error "App distribution not available or valid at $DIST_PATH"
+        exit 1
+    fi
+    
+    print_header "Deploying App to $APPS_DIR..."
+
+    # Remove old version if it exists
+    if [ -d "$APPS_DIR/$APP_NAME" ]; then
+        print_info "Removing existing installation..."
+        sudo rm -rf "$APPS_DIR/$APP_NAME"
+        print_success "Existing installation removed"
+    fi
+    
+    # Copy app to Applications directory
+    if sudo cp -r "$DIST_PATH" "$APPS_DIR/"; then
+        print_success "App moved to $APPS_DIR/$APP_NAME"
+    else
+        print_error "Failed to copy app to Applications directory"
+        exit 1
+    fi
+    
+    print_header "Installtion complete"
+    print_success "$APP_NAME installed successfully"
+}
+
+main
