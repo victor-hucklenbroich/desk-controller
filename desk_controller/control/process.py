@@ -167,3 +167,18 @@ class ProcessManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+class Controller:
+    @staticmethod
+    def execute_command(cmd: str):
+        """
+        Static helper to run a command through a bash shell.
+        Logs the result and handles exceptions.
+        """
+        LOGGER.info(f"Executing command: {cmd}")
+        try:
+            with ProcessManager(['bash']) as pm:
+                result = pm.send(cmd)
+                LOGGER.info(f"Command result: {result}")
+        except Exception as e:
+            LOGGER.error(f"Error executing command: {e}")

@@ -12,7 +12,7 @@ from AppKit import (
 from Foundation import NSObject, NSMakeRect
 
 from desk_controller.constants import CONFIG_SIT, CONFIG_STAND
-from control.controller import Controller
+from control.process import Controller
 from constants import LOGGER
 import constants
 
@@ -188,7 +188,7 @@ class SliderView(NSView):
             self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", False, True)
 
             cmd = constants.MOVE_CMD + str(target_value * 10)
-            desk_thread = threading.Thread(target=Controller.execute, args=(cmd,), daemon=True)
+            desk_thread = threading.Thread(target=Controller.execute_command, args=(cmd,), daemon=True)
             desk_thread.start()
 
             time.sleep(1.5)
