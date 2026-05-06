@@ -21,7 +21,7 @@ class MenuBarApp(NSObject):
     """
 
     def init(self):
-        LOGGER.info("Initializing MenuBarApp")
+        LOGGER.debug("Initializing MenuBarApp NSObject")
         self = objc.super(MenuBarApp, self).init()
         if self is None:
             return None
@@ -34,9 +34,8 @@ class MenuBarApp(NSObject):
             SliderView.updateUI(self.status_item, None, 75, False) # initial UI state
             self.status_item.button().setTarget_(self)
             self.status_item.button().setAction_("togglePopover:")
-            LOGGER.info("Status bar item created")
+            LOGGER.debug("Status bar item created")
 
-            LOGGER.info("Starting linak-controller server")
             self.server = Server.alloc().initWithCommand_(
                 constants.LINAK_PATH + " --server"
             )
@@ -46,9 +45,9 @@ class MenuBarApp(NSObject):
             self.popover_window = None
             self.is_visible = False
 
-            LOGGER.info("MenuBarApp initialized successfully")
+            LOGGER.debug("MenuBarApp NSObject initialized successfully")
         except Exception as e:
-            LOGGER.error(f"Error initializing MenuBarApp: {e}", exc_info=True)
+            LOGGER.error(f"Error initializing MenuBarApp NSObject: {e}", exc_info=True)
         return self
 
     def togglePopover_(self, sender):

@@ -234,17 +234,17 @@ class SliderView(NSView):
 
     def shortcutSit_(self, sender):
         """Action for Sit button."""
-        LOGGER.info("Sit shortcut button pressed")
+        LOGGER.debug("Sit shortcut button pressed")
         self.startTransition_(CONFIG_SIT, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
-        LOGGER.info("Stand shortcut button pressed")
+        LOGGER.debug("Stand shortcut button pressed")
         self.startTransition_(CONFIG_STAND, move_slider_handle=True)
 
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""
-        LOGGER.info("Quit button pressed")
+        LOGGER.debug("Quit button pressed")
         if hasattr(self, "app") and hasattr(self.app, "server"):
             server = self.app.server
             if server and server.is_running():
