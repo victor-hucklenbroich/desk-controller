@@ -1,5 +1,7 @@
 import subprocess
 
+from Foundation import NSObject, NSTimer
+
 from constants import LOGGER
 from control.process import BackgroundProcess, ProcessManager
 

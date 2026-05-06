@@ -10,7 +10,7 @@ from AppKit import (
 from Foundation import NSObject, NSMakeRect
 
 from ui.views.slider import SliderView
-from control.controller import Controller
+from control.server import Server
 from constants import LOGGER
 import constants
 
@@ -37,7 +37,10 @@ class MenuBarApp(NSObject):
             LOGGER.info("Status bar item created")
 
             LOGGER.info("Starting linak-controller server")
-            self.server = Controller.start_background_server(constants.LINAK_PATH + " --server")
+            self.server = Server.alloc().initWithCommand_(
+                constants.LINAK_PATH + " --server"
+            )
+            self.server.start()
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None

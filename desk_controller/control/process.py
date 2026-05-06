@@ -2,27 +2,77 @@ import queue
 import subprocess
 import threading
 import time
+import objc
+from Foundation import NSObject, NSTimer
 
 from constants import LOGGER
 
 
+class _TimerProxy(NSObject):
+    """Bridges NSTimer selector-based callback into a plain Python callable."""
+
+    def initWithCallback_(self, callback):
+        self = objc.super(_TimerProxy, self).init()
+        if self is None:
+            return None
+        self._callback = callback
+        return self
+
+    def fire_(self, timer):
+        self._callback()
+
+
 class BackgroundProcess:
     """
-    A wrapper around a subprocess.Popen object to manage its lifecycle
-    and provide a clean way to terminate background tasks like the server.
+    A wrapper around a subprocess.Popen object to manage its lifecycle,
+    poll the process health and provide a clean way to terminate background
+    tasks like the server.
     """
 
     def __init__(self, process):
         self.process = process
         self.active = True
+        self._timer = None
+        self._proxy = None
         LOGGER.info(f"BackgroundProcess created with PID: {process.pid}")
 
     def is_running(self):
         """Checks if the process is still active."""
         return self.process.poll() is None
 
+    def start_health_check(self, interval=2.0, on_terminated=None):
+        """
+        Polls the process every interval seconds on the main run loop.
+        Calls on_terminated(self) once if the process is no longer alive
+        and stops polling.
+        """
+        if self._timer is not None:
+            return  # already polling
+
+        def tick():
+            if not self.is_running() and self.active:
+                LOGGER.warning(
+                    f"BackgroundProcess {self.process.pid} died "
+                    f"(rc={self.process.returncode})"
+                )
+                self.stop_health_check()
+                if on_terminated is not None:
+                    on_terminated(self)
+
+        self._proxy = _TimerProxy.alloc().initWithCallback_(tick)
+        self._timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            interval, self._proxy, "fire:", None, True
+        )
+
+    def stop_health_check(self):
+        if self._timer is not None:
+            self._timer.invalidate()
+            self._timer = None
+        self._proxy = None
+
     def stop(self):
         """Terminates the process, falling back to kill if necessary."""
+        self.stop_health_check()
         if self.is_running():
             self.process.terminate()
             try:
