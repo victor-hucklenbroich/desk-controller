@@ -9,8 +9,8 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
-from ui.view import PopoverContentView
-from control.process import Controller
+from ui.views.slider import SliderView
+from control.controller import Controller
 from constants import LOGGER
 import constants
 
@@ -31,7 +31,7 @@ class MenuBarApp(NSObject):
                 NSVariableStatusItemLength
             )
 
-            PopoverContentView.updateUI(self.status_item, None, 75, False) # initial UI state
+            SliderView.updateUI(self.status_item, None, 75, False) # initial UI state
             self.status_item.button().setTarget_(self)
             self.status_item.button().setAction_("togglePopover:")
             LOGGER.info("Status bar item created")
@@ -70,7 +70,7 @@ class MenuBarApp(NSObject):
             self.popover_window.setBackgroundColor_(NSColor.clearColor())
             self.popover_window.setLevel_(3)
 
-            content_view = PopoverContentView.alloc().initWithApp_(self)
+            content_view = SliderView.alloc().initWithApp_(self)
             self.popover_window.setContentView_(content_view)
 
         # Calculate position relative to the status item

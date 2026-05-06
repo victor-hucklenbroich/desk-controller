@@ -12,20 +12,34 @@ from AppKit import (
 from Foundation import NSObject, NSMakeRect
 
 from desk_controller.constants import CONFIG_SIT, CONFIG_STAND
-from ui.slider import SliderCell
-from control.process import Controller
+from control.controller import Controller
 from constants import LOGGER
 import constants
 
 
-class PopoverContentView(NSView):
+class SliderCell(NSSliderCell):
+    """
+    Subclass of NSSliderCell to capture the mouse release event on the slider.
+    """
+
+    def stopTracking_at_inView_mouseIsUp_(self, last_point, stop_point, view, mouse_is_up):
+        # Call parent implementation to ensure standard slider behavior
+        objc.super(SliderCell, self).stopTracking_at_inView_mouseIsUp_(last_point, stop_point, view, mouse_is_up)
+
+        if mouse_is_up:
+            target = view.target()
+            if target and hasattr(target, "sliderReleased_"):
+                target.sliderReleased_(view)
+
+
+class SliderView(NSView):
     """
     The main UI view for the desk controller popover.
     Handles the UI layout, button interactions, and the asynchronous movement transitions.
     """
 
     def initWithApp_(self, app):
-        self = objc.super(PopoverContentView, self).init()
+        self = objc.super(SliderView, self).init()
         if self is None:
             return None
 
@@ -201,7 +215,7 @@ class PopoverContentView(NSView):
     def syncTransitionUI_(self, data):
         """Objective-C selector to update UI elements on the Main Thread."""
         val = round(data["val"])
-        PopoverContentView.updateUI(self.app.status_item, self.slider, val, data["move_slider"])
+        SliderView.updateUI(self.app.status_item, self.slider, val, data["move_slider"])
 
     def setUIState_(self, enabled):
         """Enables or disables UI elements to prevent user input during transitions."""
