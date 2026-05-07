@@ -10,6 +10,7 @@ from AppKit import (
 from Foundation import NSObject, NSMakeRect
 
 from ui.views.slider import SliderView
+from ui.views.no_connection import NoConnectionView
 from control.server import Server
 from constants import LOGGER
 import constants

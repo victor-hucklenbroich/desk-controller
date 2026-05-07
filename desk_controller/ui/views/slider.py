@@ -1,5 +1,6 @@
 import threading
 import time
+
 import Cocoa
 import objc
 from AppKit import (
@@ -11,10 +12,11 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
-from desk_controller.constants import CONFIG_SIT, CONFIG_STAND
-from control.process import Controller
-from constants import LOGGER
 import constants
+from constants import LOGGER
+from control.process import Controller
+from desk_controller.constants import CONFIG_SIT, CONFIG_STAND
+from ui import window
 
 
 class SliderCell(NSSliderCell):
@@ -94,19 +96,19 @@ class SliderView(NSView):
         max_label.setAlignment_(2)
         self.addSubview_(max_label)
 
-        # Name label
-        name_label = NSTextField.alloc().initWithFrame_(
+        # Version label
+        version_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(4, 8, 90, 16)
         )
-        name_label.setStringValue_(constants.VERSION)
-        name_label.setBezeled_(False)
-        name_label.setDrawsBackground_(False)
-        name_label.setEditable_(False)
-        name_label.setSelectable_(False)
-        name_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
-        name_label.setFont_(NSFont.systemFontOfSize_(12))
-        name_label.setAlignment_(2)
-        self.addSubview_(name_label)
+        version_label.setStringValue_(constants.VERSION)
+        version_label.setBezeled_(False)
+        version_label.setDrawsBackground_(False)
+        version_label.setEditable_(False)
+        version_label.setSelectable_(False)
+        version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
+        version_label.setFont_(NSFont.systemFontOfSize_(12))
+        version_label.setAlignment_(2)
+        self.addSubview_(version_label)
 
         # Shortcut buttons for preset heights
         self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(22, 38, 163, 25))
@@ -124,7 +126,7 @@ class SliderView(NSView):
         self.addSubview_(self.stand_button)
 
         # App Quit button
-        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(275, 5, 57, 27))
+        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
         quit_button.setTitle_("Quit")
         quit_button.setBezelStyle_(8)
         quit_button.setTarget_(self)
@@ -132,26 +134,7 @@ class SliderView(NSView):
         self.addSubview_(quit_button)
 
     def drawRect_(self, rect):
-        """Custom drawing code for the view's background and border."""
-        try:
-            outer_radius = 18.0
-            outer_path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, outer_radius, outer_radius)
-
-            bright = NSColor.colorWithCalibratedWhite_alpha_(0.95, 0.5)
-            bright.set()
-            outer_path.setLineWidth_(0.5)
-            outer_path.stroke()
-
-            inset_amount = 0.8
-            inner_rect = Cocoa.NSInsetRect(rect, inset_amount, inset_amount)
-            inner_radius = max(outer_radius - inset_amount, 7.0)
-            inner_path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(inner_rect, inner_radius, inner_radius)
-
-            NSColor.colorWithCalibratedRed_green_blue_alpha_(0.1, 0.1, 0.12, 0.9).setFill()
-            inner_path.stroke()
-            inner_path.fill()
-        except Exception as e:
-            LOGGER.exception("drawRect_ failed: %s", e)
+        window.draw_rect(rect)
 
     @staticmethod
     @objc.python_method
