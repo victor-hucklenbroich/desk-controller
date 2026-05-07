@@ -33,7 +33,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 # --- Static Constants ---
-VERSION: str = "1.1.0-alpha"
+VERSION: str = "v1.1.0-alpha"
 MIN_HEIGHT: int = 63
 MAX_HEIGHT: int = 127
 LINAK_PATH: str = "/opt/homebrew/anaconda3/bin/linak-controller"

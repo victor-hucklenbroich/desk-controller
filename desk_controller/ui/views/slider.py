@@ -98,7 +98,7 @@ class SliderView(NSView):
         name_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(4, 8, 145, 16)
         )
-        name_label.setStringValue_(f"DeskController {constants.VERSION}")
+        name_label.setStringValue_(constants.VERSION)
         name_label.setBezeled_(False)
         name_label.setDrawsBackground_(False)
         name_label.setEditable_(False)
