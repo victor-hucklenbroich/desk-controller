@@ -110,3 +110,10 @@ class MenuBarApp(NSObject):
             frame = self.popover_window.frame()
             if not Cocoa.NSPointInRect(point, frame):
                 self.hidePopover()
+
+    def quit(self):
+        if hasattr(self, "server"):
+            if self.server and self.server.is_running():
+                self.server.stop()
+        LOGGER.info("Terminating application")
+        Cocoa.NSApp.terminate_(None)

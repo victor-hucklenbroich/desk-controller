@@ -245,8 +245,4 @@ class SliderView(NSView):
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""
         LOGGER.debug("Quit button pressed")
-        if hasattr(self, "app") and hasattr(self.app, "server"):
-            server = self.app.server
-            if server and server.is_running():
-                server.stop()
-        Cocoa.NSApp.terminate_(None)
+        self.app.quit()
