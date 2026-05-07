@@ -96,7 +96,7 @@ class SliderView(NSView):
 
         # Name label
         name_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(4, 8, 145, 16)
+            NSMakeRect(4, 8, 90, 16)
         )
         name_label.setStringValue_(constants.VERSION)
         name_label.setBezeled_(False)
