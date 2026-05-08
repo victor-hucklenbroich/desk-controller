@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import sys
 import yaml
 
@@ -36,7 +37,7 @@ LOGGER = logging.getLogger(__name__)
 VERSION: str = "v1.1.0-alpha"
 MIN_HEIGHT: int = 63
 MAX_HEIGHT: int = 127
-LINAK_PATH: str = "/opt/homebrew/anaconda3/bin/linak-controller"
+LINAK_PATH = shutil.which("linak-controller") or "/opt/homebrew/anaconda3/bin/linak-controller"
 MOVE_CMD: str = LINAK_PATH + " --forward --move-to "
 FAILURE_MARKERS: tuple = ("Traceback", "Something unexpected went wrong")
 
