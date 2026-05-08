@@ -1,11 +1,13 @@
+import socket
 import subprocess
 
 import Cocoa
 import objc
 from Foundation import NSObject, NSTimer
 
+import constants
 from constants import LOGGER
-from control.process import BackgroundProcess
+from control.process import BackgroundProcess, _TimerProxy
 
 
 class Server(NSObject):
@@ -23,15 +25,22 @@ class Server(NSObject):
         self._command = command
         self._process = None
         self._observing_workspace = False
+        self._dead = False
+        self._failures = 0
+        self._probe_timer = None
+        self._probe_proxy = None
         return self
 
     @objc.python_method
     def start(self):
+        self._dead = False
+        self._failures = 0
         self._spawn("initial start")
         self._registerWorkspaceObservers()
 
     @objc.python_method
     def stop(self):
+        self._cancelProbe()
         self._unregisterWorkspaceObservers()
         self._teardownProcess("supervisor stop")
 
@@ -40,9 +49,84 @@ class Server(NSObject):
         return self._process is not None and self._process.is_running()
 
     @objc.python_method
+    def is_dead(self):
+        return self._dead
+
+    @objc.python_method
+    def is_healthy(self):
+        """Process alive AND TCP port reachable."""
+        return self.is_running() and self._probePort()
+
+    @objc.python_method
+    def retry(self):
+        """User-initiated retry after the server has been declared dead."""
+        if not self._dead:
+            return
+        LOGGER.info("Retrying server")
+        self._dead = False
+        self._failures = 0
+        self._spawn("user retry")
+
+    @objc.python_method
+    def _probePort(self):
+        try:
+            with socket.create_connection(
+                    (constants.SERVER_HOST, constants.SERVER_PORT), timeout=0.5
+            ):
+                return True
+        except (OSError, socket.timeout):
+            return False
+
+    @objc.python_method
+    def _scheduleReadinessProbe(self):
+        self._cancelProbe()
+        self._probe_proxy = _TimerProxy.alloc().initWithCallback_(self._onProbe)
+        self._probe_timer = (
+            NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                2.5, self._probe_proxy, "fire:", None, False
+            )
+        )
+
+    @objc.python_method
+    def _cancelProbe(self):
+        if self._probe_timer is not None:
+            self._probe_timer.invalidate()
+            self._probe_timer = None
+        self._probe_proxy = None
+
+    @objc.python_method
+    def _onProbe(self):
+        self._cancelProbe()
+        if self._process is None or self._dead:
+            return  # torn down or already given up
+
+        if self.is_running() and self._probePort():
+            LOGGER.info(
+                f"Server ready on {constants.SERVER_HOST}:{constants.SERVER_PORT}"
+            )
+            self._failures = 0
+            # TODO checkAndUpdatePopover
+            return
+
+        self._failures += 1
+        LOGGER.warning(
+            f"Server probe failed ({self._failures}/{constants.MAX_RECONNECT_FAILURES})"
+        )
+        if self._failures >= constants.MAX_RECONNECT_FAILURES:
+            LOGGER.error("Server unreachable after retries; marking dead")
+            self._teardownProcess("max failures reached")
+            self._dead = True
+            # TODO checkAndUpdatePopover
+            return
+
+        self._recycle("retry after failed probe")
+
+    @objc.python_method
     def _spawn(self, reason):
         LOGGER.info(f"Starting server ({reason})")
-        cmd_list = self._command.split() if isinstance(self._command, str) else self._command
+        cmd_list = (
+            self._command.split() if isinstance(self._command, str) else self._command
+        )
         popen = subprocess.Popen(
             cmd_list,
             stdin=subprocess.PIPE,
@@ -54,9 +138,11 @@ class Server(NSObject):
         self._process.start_health_check(
             interval=2.0, on_terminated=self._onProcessDied
         )
+        self._scheduleReadinessProbe()
 
     @objc.python_method
     def _teardownProcess(self, reason):
+        self._cancelProbe()
         if self._process is None:
             return
         LOGGER.info(f"Stopping server ({reason})")
@@ -73,7 +159,15 @@ class Server(NSObject):
 
     @objc.python_method
     def _onProcessDied(self, bg_process):
-        # Fired on the main thread by BackgroundProcess's NSTimer.
+        if self._dead:
+            return
+        self._failures += 1
+        if self._failures >= constants.MAX_RECONNECT_FAILURES:
+            LOGGER.error("Server keeps dying; marking dead")
+            self._teardownProcess("max failures reached")
+            self._dead = True
+            # TODO checkAndUpdatePopover
+            return
         self._recycle("process exited")
 
     @objc.python_method

@@ -14,13 +14,13 @@ from constants import LOGGER
 from ui import window
 
 
-class NoConnectionView(NSView):
+class StartUpView(NSView):
     """
-    UI View for communicating connection issues with the local server.
+    Intermediary UI view displayed while connecting and setting up desk connection.
     """
 
     def initWithApp_(self, app):
-        self = objc.super(NoConnectionView, self).init()
+        self = objc.super(StartUpView, self).init()
         if self is None:
             return None
 
@@ -39,7 +39,7 @@ class NoConnectionView(NSView):
         error_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(38, 40, 295, 50)
         )
-        error_label.setStringValue_("⚠ Could not connect to your Desk!")
+        error_label.setStringValue_("Connecting to your Desk...")
         error_label.setBezeled_(False)
         error_label.setDrawsBackground_(False)
         error_label.setEditable_(False)
@@ -52,7 +52,7 @@ class NoConnectionView(NSView):
         error_sub_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(38, 18, 295, 50)
         )
-        error_sub_label.setStringValue_("Please check your UUID and Bluetooth pairing")
+        error_sub_label.setStringValue_("Please wait")
         error_sub_label.setBezeled_(False)
         error_sub_label.setDrawsBackground_(False)
         error_sub_label.setEditable_(False)
@@ -76,14 +76,6 @@ class NoConnectionView(NSView):
         version_label.setAlignment_(2)
         self.addSubview_(version_label)
 
-        # Retry button
-        retry_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(154, 5, 75, 27))
-        retry_button.setTitle_("Try again")
-        retry_button.setBezelStyle_(8)
-        retry_button.setTarget_(self)
-        retry_button.setAction_("retry:")
-        self.addSubview_(retry_button)
-
         # App Quit button
         quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
         quit_button.setTitle_("Quit")
@@ -94,12 +86,6 @@ class NoConnectionView(NSView):
 
     def drawRect_(self, rect):
         window.draw_rect(rect)
-
-    def retry_(self, sender):
-        """Triggers user initiated server retry"""
-        LOGGER.debug("Retry button pressed")
-        self.app.server.retry()
-        self.app.checkAndUpdatePopover()
 
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""

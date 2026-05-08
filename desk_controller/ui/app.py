@@ -1,3 +1,5 @@
+from enum import Enum
+
 import Cocoa
 import objc
 from AppKit import (
@@ -9,11 +11,18 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
+from ui.views.startup import StartUpView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
 from control.server import Server
 from constants import LOGGER
 import constants
+
+
+class ContentViews(Enum):
+    STARTUP = 0
+    SLIDER = 1
+    NOCON = 2
 
 class MenuBarApp(NSObject):
     """
@@ -44,6 +53,7 @@ class MenuBarApp(NSObject):
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None
+            self.current_content = None
             self.is_visible = False
 
             LOGGER.debug("MenuBarApp NSObject initialized successfully")
@@ -73,8 +83,7 @@ class MenuBarApp(NSObject):
             self.popover_window.setBackgroundColor_(NSColor.clearColor())
             self.popover_window.setLevel_(3)
 
-            content_view = SliderView.alloc().initWithApp_(self)
-            self.popover_window.setContentView_(content_view)
+        self.checkAndUpdatePopover()
 
         # Calculate position relative to the status item
         button_frame = self.status_item.button().window().frame()
@@ -111,6 +120,28 @@ class MenuBarApp(NSObject):
             frame = self.popover_window.frame()
             if not Cocoa.NSPointInRect(point, frame):
                 self.hidePopover()
+
+    def checkAndUpdatePopover(self):
+        """Check server status and update the popover content view if necessary."""
+        if not self.server.is_dead() and not self.server.is_healthy():
+            # connecting
+            requiredView = ContentViews.STARTUP
+            content_view = StartUpView.alloc().initWithApp_(self)
+        elif self.server.is_dead():
+            # connection error
+            requiredView = ContentViews.NOCON
+            content_view = NoConnectionView.alloc().initWithApp_(self)
+        elif self.server.is_healthy():
+            # normal operation
+            requiredView = ContentViews.SLIDER
+            content_view = SliderView.alloc().initWithApp_(self)
+        else:
+            # nonsensical server status
+            requiredView = None
+
+        if requiredView != self.current_content:
+            # update if required view is not already displayed
+            self.popover_window.setContentView_(content_view)
 
     def quit(self):
         if hasattr(self, "server"):

@@ -212,16 +212,19 @@ class SliderView(NSView):
 
     def sliderReleased_(self, sender):
         """Triggered when user releases the slider thumb via CustomSliderCell."""
+        self.app.checkAndUpdatePopover()
         target = round(self.slider.doubleValue())
         self.startTransition_(target, move_slider_handle=False)
 
     def shortcutSit_(self, sender):
         """Action for Sit button."""
+        self.app.checkAndUpdatePopover()
         LOGGER.debug("Sit shortcut button pressed")
         self.startTransition_(CONFIG_SIT, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
+        self.app.checkAndUpdatePopover()
         LOGGER.debug("Stand shortcut button pressed")
         self.startTransition_(CONFIG_STAND, move_slider_handle=True)
 
