@@ -40,14 +40,20 @@ The App is only tested on Apple Silicon Macs with macOS Tahoe, but there isn't b
    git clone https://github.com/victor-hucklenbroich/desk-controller.git
    ```
 
-2. **Run the installation script**:
+2. **Navigate to the local repository**:
+
+   ```bash
+   cd desk-controller
+   ```
+
+3. **Run the installation script**:
 
    (Note: this step might ask you to automatically install the dependencies)
    ```bash
-   desk-controller/install
+   ./install
    ```
    
-3. **Launch the App**:
+4. **Launch the App**:
 
    `/Applications/DeskController.app`
  
