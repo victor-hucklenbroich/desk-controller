@@ -46,7 +46,7 @@ collect = COLLECT(
 app = BUNDLE(
     collect,
     name='DeskController.app',
-    icon='assets/app_icon.icns',
+    icon='assets/icon/app_icon.icns',
     bundle_identifier='com.victorhucklenbroich.DeskController',
     info_plist={
         'NSPrincipalClass': 'NSApplication',
