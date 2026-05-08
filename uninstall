@@ -123,33 +123,6 @@ remove_pyobjc() {
     fi
 }
 
-# Optionally uninstall Homebrew (destructive — affects entire system)
-remove_homebrew() {
-    if ! command -v brew &> /dev/null; then
-        return 0
-    fi
-
-    print_warning "Uninstalling Homebrew will remove ALL Homebrew-installed packages"
-    print_warning "This affects software completely unrelated to DeskController"
-
-    if ! confirm "Uninstall Homebrew?"; then
-        print_info "Keeping Homebrew"
-        return 0
-    fi
-
-    if ! confirm "Are you absolutely sure? This is destructive and irreversible."; then
-        print_info "Keeping Homebrew"
-        return 0
-    fi
-
-    print_info "Running the official Homebrew uninstaller..."
-    if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"; then
-        print_success "Homebrew uninstalled"
-    else
-        print_error "Homebrew uninstaller exited with an error"
-    fi
-}
-
 main() {
     print_header "DeskController Uninstaller"
 
@@ -161,7 +134,6 @@ main() {
 
     remove_linak_controller
     remove_pyobjc
-    remove_homebrew
 
     print_header "Uninstall complete"
     print_success "DeskController removed"

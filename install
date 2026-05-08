@@ -11,95 +11,78 @@ APP_NAME="DeskController.app"
 DIST_PATH="$REPO_ROOT/dist/$APP_NAME"
 SPEC_FILE="$REPO_ROOT/app.spec"
 APPS_DIR="/Applications"
-LINAK_PATH="/opt/homebrew/anaconda3/bin/linak-controller"
+
+# Set to "--break-system-packages" if Python enforces PEP 668
+PIP_FLAGS=""
 
 # Echo functions
 print_header() {
     echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}$1${NC}"
-    echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
-print_success() {
-    echo -e "${GREEN}✓ $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}✗ $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠ $1${NC}"
-}
-
-print_info() {
-    echo -e "${BLUE}ℹ $1${NC}"
-}
+print_success() { echo -e "${GREEN}✓ $1${NC}"; }
+print_error()   { echo -e "${RED}✗ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}⚠ $1${NC}"; }
+print_info()    { echo -e "${BLUE}ℹ $1${NC}"; }
 
 # Dependency checks
 check_python() {
     print_info "Checking Python installation..."
-    
+
     if ! command -v python3 &> /dev/null; then
         print_error "Python 3 is not installed"
         return 1
     fi
-    
+
     PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
     PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
-    
+
     if [ "$PYTHON_MAJOR" -lt 3 ]; then
         print_error "Python 3.x required, but found Python $PYTHON_VERSION"
         return 1
     fi
-    
-    print_success "Python $PYTHON_VERSION found"
-    return 0
-}
 
-check_homebrew() {
-    print_info "Checking Homebrew installation..."
-    
-    if ! command -v brew &> /dev/null; then
-        print_warning "Homebrew is not installed"
-        read -p "Would you like to install Homebrew now? (y/n) " -n 1 -r
+    print_success "Python $PYTHON_VERSION found"
+
+    # Detect PEP 668 (externally-managed-environment) once, up front
+    local stdlib_path
+    stdlib_path=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')
+    if [ -f "$stdlib_path/EXTERNALLY-MANAGED" ]; then
+        print_warning "This Python is marked as externally-managed (PEP 668)"
+        print_warning "pip installs will fail without --break-system-packages"
+        read -p "Allow pip to use --break-system-packages? (y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Installing Homebrew..."
-            if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
-                print_success "Homebrew installed successfully"
-                return 0
-            else
-                print_error "Failed to install Homebrew"
-                return 1
-            fi
+            PIP_FLAGS="--break-system-packages"
         else
-            print_warning "Homebrew installation skipped"
+            print_error "Cannot install Python dependencies. Use a venv or pipx and re-run."
             return 1
         fi
     fi
-    
-    print_success "Homebrew is installed"
+
     return 0
 }
 
 check_linak_controller() {
     print_info "Checking linak-controller installation..."
-    
-    if [ -f "$LINAK_PATH" ]; then
-        print_success "linak-controller is installed at correct path"
+
+    if command -v linak-controller &> /dev/null; then
+        print_success "linak-controller found at $(command -v linak-controller)"
         return 0
     fi
-    
-    if ! command -v brew &> /dev/null; then
-        print_error "Homebrew not available, cannot install linak-controller"
-        return 1
-    fi
-    
-    print_info "Installing linak-controller via Homebrew..."
-    if brew install linak-controller; then
-        print_success "linak-controller installed successfully"
-        return 0
+
+    print_info "Installing linak-controller via pip..."
+    if pip3 install $PIP_FLAGS linak-controller; then
+        if command -v linak-controller &> /dev/null; then
+            print_success "linak-controller installed at $(command -v linak-controller)"
+            return 0
+        else
+            print_error "linak-controller installed but not found on PATH"
+            print_info "You may need to add the Python user bin directory to your PATH"
+            return 1
+        fi
     else
         print_error "Failed to install linak-controller"
         return 1
@@ -108,14 +91,14 @@ check_linak_controller() {
 
 check_pyobjc() {
     print_info "Checking PyObjC installation..."
-    
+
     if python3 -c "import objc" 2>/dev/null; then
         print_success "PyObjC is installed"
         return 0
     fi
-    
-    print_warning "PyObjC is not installed, installing now..."
-    if pip3 install pyobjc; then
+
+    print_info "Installing PyObjC..."
+    if pip3 install $PIP_FLAGS pyobjc; then
         print_success "PyObjC installed successfully"
         return 0
     else
@@ -124,26 +107,47 @@ check_pyobjc() {
     fi
 }
 
+check_pyinstaller() {
+    print_info "Checking PyInstaller installation..."
+
+    if command -v pyinstaller &> /dev/null; then
+        print_success "PyInstaller is installed"
+        return 0
+    fi
+
+    print_info "Installing PyInstaller..."
+    if pip3 install $PIP_FLAGS pyinstaller; then
+        if command -v pyinstaller &> /dev/null; then
+            print_success "PyInstaller installed successfully"
+            return 0
+        else
+            print_error "PyInstaller installed but not found on PATH"
+            return 1
+        fi
+    else
+        print_error "Failed to install PyInstaller"
+        return 1
+    fi
+}
+
 # Main script
 main() {
     print_header "Dependency Check"
-    
-    # Track if all checks passed
+
     DEPS_OK=true
-    
-    # Run all checks
-    check_python || DEPS_OK=false
-    check_homebrew || print_warning "Some features may not work without Homebrew"
+
+    check_python          || DEPS_OK=false
     check_linak_controller || DEPS_OK=false
-    check_pyobjc || DEPS_OK=false
-    
+    check_pyobjc          || DEPS_OK=false
+    check_pyinstaller     || DEPS_OK=false
+
     if [ "$DEPS_OK" = false ]; then
         print_error "Dependency checks failed. Please fix the issues above."
         exit 1
     fi
-    
-    print_header "Building App with Pyinstaller and $SPEC_FILE"
-    
+
+    print_header "Building app with PyInstaller and $SPEC_FILE"
+
     if pyinstaller "$SPEC_FILE"; then
         print_success "Build completed successfully"
     else
@@ -155,25 +159,23 @@ main() {
         print_error "App distribution not available or valid at $DIST_PATH"
         exit 1
     fi
-    
-    print_header "Deploying App to $APPS_DIR..."
 
-    # Remove old version if it exists
+    print_header "Deploying app to $APPS_DIR"
+
     if [ -d "$APPS_DIR/$APP_NAME" ]; then
         print_info "Removing existing installation..."
         sudo rm -rf "$APPS_DIR/$APP_NAME"
         print_success "Existing installation removed"
     fi
-    
-    # Copy app to Applications directory
+
     if sudo cp -r "$DIST_PATH" "$APPS_DIR/"; then
         print_success "App moved to $APPS_DIR/$APP_NAME"
     else
         print_error "Failed to copy app to Applications directory"
         exit 1
     fi
-    
-    print_header "Installtion complete"
+
+    print_header "Installation complete"
     print_success "$APP_NAME installed successfully"
 }
 
