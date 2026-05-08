@@ -51,7 +51,7 @@ The App is only tested on Apple Silicon Macs with macOS Tahoe, but there isn't b
 
    `/Applications/DeskController.app`
  
-![image](./assets/examples/startup_view.png) ![image](./assets/examples/desk_controller_view.png)
+![image](./assets/screenshots/startup_view.png) ![image](./assets/screenshots/desk_controller_view.png)
 
 
 
@@ -61,7 +61,7 @@ Should something go wrong during the execution of the installation script, it's 
 
 
 
-![image](./assets/examples/connection_error_message.png)
+![image](./assets/screenshots/connection_error_message.png)
 
 If the DeskController App is not launching properly there is a prelaunch error log available at `~/Library/Logs/DeskController_error.log`. Most common issues are problems with linak-controller and its config, the provided UUID of your desk, or the Bluetooth connection between your Mac and desk. Before proceeding double check that DeskController can find your linak-controller path and config file (`~/Library/Application Support/linak-controller/config.yaml`). This is where DeskController is looking for the UUID of your desk. Also make sure the UUID is correct, and you can connect to your desk via Bluetooth.  If you are still facing issues, check the runtime logs located at `~/Library/Logs/DeskController.log`. At this point you might also want to check the DeskController and linak-controller source code.
 
