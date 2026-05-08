@@ -12,12 +12,20 @@ from AppKit import (
 from Foundation import NSObject, NSMakeRect
 
 from ui.views.connecting import EstablishingConnectionView
+from ui.views.setup import InitialSetupView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
 from control.server import Server
 from constants import LOGGER
 import constants
 
+
+class KeyableWindow(NSWindow):
+    """Borderless NSWindow subclass that can become key (needed for text input)."""
+    def canBecomeKeyWindow(self):
+        return True
+    def canBecomeMainWindow(self):
+        return True
 
 class ContentViews(Enum):
     STARTUP = 0
@@ -73,7 +81,7 @@ class MenuBarApp(NSObject):
         """Creates and displays the popover window below the menu bar icon."""
         if self.popover_window is None:
             rect = NSMakeRect(0, 0, 364, 120)
-            self.popover_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            self.popover_window = KeyableWindow.alloc().initWithContentRect_styleMask_backing_defer_(
                 rect,
                 NSWindowStyleMaskBorderless,
                 NSBackingStoreBuffered,
