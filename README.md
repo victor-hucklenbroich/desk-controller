@@ -65,6 +65,9 @@ Should something go wrong during the execution of the installation script, it's 
 
 If the DeskController App is not launching properly there is a prelaunch error log available at `~/Library/Logs/DeskController_error.log`. Most common issues are problems with linak-controller and its config, the provided UUID of your desk, or the Bluetooth connection between your Mac and desk. Before proceeding double check that DeskController can find your linak-controller path and config file (`~/Library/Application Support/linak-controller/config.yaml`). This is where DeskController is looking for the UUID of your desk. Also make sure the UUID is correct, and you can connect to your desk via Bluetooth.  If you are still facing issues, check the runtime logs located at `~/Library/Logs/DeskController.log`. At this point you might also want to check the DeskController and linak-controller source code.
 
+## Uninstall
+If you do not like DeskController you can remove it easily with the [uninstall](./uninstall) script, analogous in execution to the install script. This will only leave the cloned repository, which you can delete manually.
+
 ## Acknowledgements
 
 - Built with [linak-controller](https://github.com/rhyst/linak-controller) by [rhyst](https://github.com/rhyst)
