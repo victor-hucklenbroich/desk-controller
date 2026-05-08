@@ -1,7 +1,10 @@
 import logging
 import os
 import shutil
+import subprocess
 import sys
+import time
+
 import yaml
 
 from pathlib import Path
@@ -16,6 +19,7 @@ else:
     base_path = Path(os.path.dirname(__file__)).parent
 
 LIBRARY_PATH = os.path.expanduser("~/Library/")
+CONFIG_FILE_PATH = os.path.join(LIBRARY_PATH, "Application Support", "linak-controller","config.yaml")
 
 
 # --- Logging Configuration ---
@@ -41,7 +45,14 @@ LINAK_PATH = shutil.which("linak-controller") or "/opt/homebrew/anaconda3/bin/li
 MOVE_CMD: str = LINAK_PATH + " --forward --move-to "
 FAILURE_MARKERS: tuple = ("Traceback", "Something unexpected went wrong")
 
-with open(os.path.join(LIBRARY_PATH, "Application Support", "linak-controller", "config.yaml")) as stream:
+# --- Preference constants ---
+if not os.path.exists(CONFIG_FILE_PATH):
+    LOGGER.warning("config.yaml not found, creating default one")
+    subprocess.Popen((LINAK_PATH, "--config"), stdin=subprocess.PIPE, text=True)
+    time.sleep(0.5)
+
+with open(CONFIG_FILE_PATH) as stream:
+    # Initial config parsing (before ConfigParser is fully initialized)
     try:
         CONFIG = yaml.safe_load(stream)
         CONFIG_SIT: int = CONFIG["favourites"]["sit"]
@@ -51,6 +62,8 @@ with open(os.path.join(LIBRARY_PATH, "Application Support", "linak-controller", 
         CONFIG_STAND: int = 1240
         LOGGER.warning(e)
 
+PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
+CONFIG_UUID: str = CONFIG["mac_address"]
 CONFIG_SIT = int(CONFIG_SIT / 10)
 CONFIG_STAND = int(CONFIG_STAND / 10)
 

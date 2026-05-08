@@ -28,9 +28,10 @@ class KeyableWindow(NSWindow):
         return True
 
 class ContentViews(Enum):
-    STARTUP = 0
-    SLIDER = 1
-    NOCON = 2
+    SETUP = 0
+    CONNECTING = 1
+    SLIDER = 2
+    NOCON = 3
 
 class MenuBarApp(NSObject):
     """
@@ -137,17 +138,21 @@ class MenuBarApp(NSObject):
         elif self.server.is_healthy():
             required = ContentViews.SLIDER
         else:
-            required = ContentViews.STARTUP
+            required = ContentViews.CONNECTING
 
         if required == self.current_content:
             return  # already showing the right view
 
-        if required == ContentViews.NOCON:
-            content_view = NoConnectionView.alloc().initWithApp_(self)
-        elif required == ContentViews.SLIDER:
-            content_view = SliderView.alloc().initWithApp_(self)
+        if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
+            content_view = InitialSetupView.alloc().initWithApp_(self)
+            required = ContentViews.SETUP
         else:
-            content_view = EstablishingConnectionView.alloc().initWithApp_(self)
+            if required == ContentViews.NOCON:
+                content_view = NoConnectionView.alloc().initWithApp_(self)
+            elif required == ContentViews.SLIDER:
+                content_view = SliderView.alloc().initWithApp_(self)
+            else:
+                content_view = EstablishingConnectionView.alloc().initWithApp_(self)
 
         self.popover_window.setContentView_(content_view)
         self.current_content = required

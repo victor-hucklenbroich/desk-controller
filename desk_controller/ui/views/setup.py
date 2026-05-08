@@ -10,6 +10,7 @@ from AppKit import (
 from Foundation import NSObject, NSMakeRect
 
 from constants import LOGGER
+from control import config
 from ui import window
 
 
@@ -98,7 +99,7 @@ class InitialSetupView(NSView):
         uuid = self.uuid_field.stringValue()
         LOGGER.info(f"user provided UUID: {uuid}")
         LOGGER.debug("Trying initial setup connection")
-        # TODO write uuid to config.yaml
+        config.ConfigParser.update(uuid)
         self.app.server.retry()
         self.app.checkAndUpdatePopover()
 
