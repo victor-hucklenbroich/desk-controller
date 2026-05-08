@@ -11,7 +11,7 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
-from ui.views.startup import StartUpView
+from ui.views.connecting import EstablishingConnectionView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
 from control.server import Server
@@ -139,7 +139,7 @@ class MenuBarApp(NSObject):
         elif required == ContentViews.SLIDER:
             content_view = SliderView.alloc().initWithApp_(self)
         else:
-            content_view = StartUpView.alloc().initWithApp_(self)
+            content_view = EstablishingConnectionView.alloc().initWithApp_(self)
 
         self.popover_window.setContentView_(content_view)
         self.current_content = required

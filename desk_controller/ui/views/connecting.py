@@ -14,13 +14,13 @@ from constants import LOGGER
 from ui import window
 
 
-class StartUpView(NSView):
+class EstablishingConnectionView(NSView):
     """
     Intermediary UI view displayed while connecting and setting up desk connection.
     """
 
     def initWithApp_(self, app):
-        self = objc.super(StartUpView, self).init()
+        self = objc.super(EstablishingConnectionView, self).init()
         if self is None:
             return None
 
