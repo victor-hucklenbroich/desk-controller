@@ -5,7 +5,7 @@ import time
 import objc
 from Foundation import NSObject, NSTimer
 
-from constants import LOGGER
+from constants import LOGGER, FAILURE_MARKERS
 
 
 class _TimerProxy(NSObject):
@@ -168,17 +168,27 @@ class ProcessManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+
 class Controller:
     @staticmethod
-    def execute_command(cmd: str):
-        """
-        Static helper to run a command through a bash shell.
-        Logs the result and handles exceptions.
-        """
+    def execute_command(cmd: str, on_failure=None):
         LOGGER.info(f"Executing command: {cmd}")
         try:
             with ProcessManager(['bash']) as pm:
                 result = pm.send(cmd)
                 LOGGER.info(f"Command result: {result}")
+                if Controller._result_indicates_failure(result):
+                    LOGGER.warning("Command output indicates server failure")
+                    if on_failure is not None:
+                        on_failure()
         except Exception as e:
             LOGGER.error(f"Error executing command: {e}")
+            if on_failure is not None:
+                on_failure()
+
+    @staticmethod
+    def _result_indicates_failure(result):
+        return any(
+            any(marker in line for marker in FAILURE_MARKERS)
+            for line in result
+        )

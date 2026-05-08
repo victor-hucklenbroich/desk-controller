@@ -23,13 +23,24 @@ class Server(NSObject):
         if self is None:
             return None
         self._command = command
+        self._app = None
         self._process = None
         self._observing_workspace = False
         self._dead = False
         self._failures = 0
         self._probe_timer = None
         self._probe_proxy = None
+        self._health_timer = None
+        self._health_proxy = None
         return self
+
+    @objc.python_method
+    def setApp(self, app):
+        """
+        Reference App instance for UI update callbacks when the
+        server status changes.
+        """
+        self._app = app
 
     @objc.python_method
     def start(self):
@@ -83,7 +94,7 @@ class Server(NSObject):
         self._probe_proxy = _TimerProxy.alloc().initWithCallback_(self._onProbe)
         self._probe_timer = (
             NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                2.5, self._probe_proxy, "fire:", None, False
+                3.0, self._probe_proxy, "fire:", None, False
             )
         )
 
@@ -105,7 +116,9 @@ class Server(NSObject):
                 f"Server ready on {constants.SERVER_HOST}:{constants.SERVER_PORT}"
             )
             self._failures = 0
-            # TODO checkAndUpdatePopover
+            self.scheduleHealthCheck()
+            if self._app is not None:
+                self._app.checkAndUpdatePopover()
             return
 
         self._failures += 1
@@ -116,10 +129,74 @@ class Server(NSObject):
             LOGGER.error("Server unreachable after retries; marking dead")
             self._teardownProcess("max failures reached")
             self._dead = True
-            # TODO checkAndUpdatePopover
+            if self._app is not None:
+                self._app.checkAndUpdatePopover()
             return
 
         self._recycle("retry after failed probe")
+
+    @objc.python_method
+    def _cancelHealthCheck(self):
+        if self._health_timer is not None:
+            self._health_timer.invalidate()
+            self._health_timer = None
+        self._health_proxy = None
+
+    @objc.python_method
+    def _cancelTimers(self):
+        self._cancelProbe()
+        self._cancelHealthCheck()
+
+    @objc.python_method
+    def _scheduleHealthCheck(self):
+        self._cancelHealthCheck()
+        self._health_proxy = _TimerProxy.alloc().initWithCallback_(self._onHealthCheck)
+        self._health_timer = (
+            NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                constants.HEALTH_CHECK_INTERVAL,
+                self._health_proxy, "fire:", None, True
+            )
+        )
+
+    @objc.python_method
+    def _onHealthCheck(self):
+        if self._dead or self._process is None:
+            self._cancelHealthCheck()
+            return
+        if self.is_running() and self._probePort():
+            return  # still healthy
+
+        LOGGER.warning("Periodic health check failed")
+        self._cancelHealthCheck()
+        self._failures += 1
+        if self._failures >= constants.MAX_RECONNECT_FAILURES:
+            self._teardownProcess("max failures (health check)")
+            self._dead = True
+            if self._app is not None:
+                self._app.checkAndUpdatePopover()
+            return
+        self._recycle("health check failed")
+
+    @objc.python_method
+    def reportCommandFailure(self):
+        # Called from a worker thread — hop to main before mutating state.
+        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+            "_handleCommandFailure:", None, False
+        )
+
+    def _handleCommandFailure_(self, _):
+        if self._dead or self._process is None:
+            return
+        LOGGER.warning("Move command returned no output; treating as BLE wedge")
+        self._cancelTimers()
+        self._failures += 1
+        if self._failures >= constants.MAX_RECONNECT_FAILURES:
+            self._teardownProcess("max failures (command)")
+            self._dead = True
+            if self._app is not None:
+                self._app.checkAndUpdatePopover()
+            return
+        self._recycle("command failure")
 
     @objc.python_method
     def _spawn(self, reason):
@@ -166,7 +243,8 @@ class Server(NSObject):
             LOGGER.error("Server keeps dying; marking dead")
             self._teardownProcess("max failures reached")
             self._dead = True
-            # TODO checkAndUpdatePopover
+            if self._app is not None:
+                self._app.checkAndUpdatePopover()
             return
         self._recycle("process exited")
 

@@ -38,6 +38,7 @@ MIN_HEIGHT: int = 63
 MAX_HEIGHT: int = 127
 LINAK_PATH: str = "/opt/homebrew/anaconda3/bin/linak-controller"
 MOVE_CMD: str = LINAK_PATH + " --forward --move-to "
+FAILURE_MARKERS: tuple = ("Traceback", "Something unexpected went wrong")
 
 with open(os.path.join(LIBRARY_PATH, "Application Support", "linak-controller", "config.yaml")) as stream:
     try:
@@ -52,10 +53,12 @@ with open(os.path.join(LIBRARY_PATH, "Application Support", "linak-controller", 
 CONFIG_SIT = int(CONFIG_SIT / 10)
 CONFIG_STAND = int(CONFIG_STAND / 10)
 
+
 # Local server constants
 SERVER_HOST: str = CONFIG.get("server_address", "127.0.0.1") if CONFIG else "127.0.0.1"
 SERVER_PORT: int = int(CONFIG.get("server_port", 9123)) if CONFIG else 9123
 MAX_RECONNECT_FAILURES: int = 3
+HEALTH_CHECK_INTERVAL: float = 5.0
 
 
 # --- UI Constants ---

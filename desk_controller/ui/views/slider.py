@@ -171,7 +171,12 @@ class SliderView(NSView):
             self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", False, True)
 
             cmd = constants.MOVE_CMD + str(target_value * 10)
-            desk_thread = threading.Thread(target=Controller.execute_command, args=(cmd,), daemon=True)
+            desk_thread = threading.Thread(
+                target=Controller.execute_command,
+                args=(cmd,),
+                kwargs={"on_failure": self.app.server.reportCommandFailure},
+                daemon=True,
+            )
             desk_thread.start()
 
             time.sleep(1.5)
@@ -212,19 +217,16 @@ class SliderView(NSView):
 
     def sliderReleased_(self, sender):
         """Triggered when user releases the slider thumb via CustomSliderCell."""
-        self.app.checkAndUpdatePopover()
         target = round(self.slider.doubleValue())
         self.startTransition_(target, move_slider_handle=False)
 
     def shortcutSit_(self, sender):
         """Action for Sit button."""
-        self.app.checkAndUpdatePopover()
         LOGGER.debug("Sit shortcut button pressed")
         self.startTransition_(CONFIG_SIT, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
-        self.app.checkAndUpdatePopover()
         LOGGER.debug("Stand shortcut button pressed")
         self.startTransition_(CONFIG_STAND, move_slider_handle=True)
 

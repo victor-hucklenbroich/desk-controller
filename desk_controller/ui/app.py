@@ -50,6 +50,7 @@ class MenuBarApp(NSObject):
                 constants.LINAK_PATH + " --server"
             )
             self.server.start()
+            self.server.setApp(self)
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None
@@ -122,26 +123,26 @@ class MenuBarApp(NSObject):
                 self.hidePopover()
 
     def checkAndUpdatePopover(self):
-        """Check server status and update the popover content view if necessary."""
-        if not self.server.is_dead() and not self.server.is_healthy():
-            # connecting
-            requiredView = ContentViews.STARTUP
-            content_view = StartUpView.alloc().initWithApp_(self)
-        elif self.server.is_dead():
-            # connection error
-            requiredView = ContentViews.NOCON
-            content_view = NoConnectionView.alloc().initWithApp_(self)
+        """Swap the popover content view if the server state changed."""
+        if self.server.is_dead():
+            required = ContentViews.NOCON
         elif self.server.is_healthy():
-            # normal operation
-            requiredView = ContentViews.SLIDER
+            required = ContentViews.SLIDER
+        else:
+            required = ContentViews.STARTUP
+
+        if required == self.current_content:
+            return  # already showing the right view
+
+        if required == ContentViews.NOCON:
+            content_view = NoConnectionView.alloc().initWithApp_(self)
+        elif required == ContentViews.SLIDER:
             content_view = SliderView.alloc().initWithApp_(self)
         else:
-            # nonsensical server status
-            requiredView = None
+            content_view = StartUpView.alloc().initWithApp_(self)
 
-        if requiredView != self.current_content:
-            # update if required view is not already displayed
-            self.popover_window.setContentView_(content_view)
+        self.popover_window.setContentView_(content_view)
+        self.current_content = required
 
     def quit(self):
         if hasattr(self, "server"):

@@ -52,7 +52,7 @@ class NoConnectionView(NSView):
         error_sub_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(38, 18, 295, 50)
         )
-        error_sub_label.setStringValue_("Please check your UUID and Bluetooth pairing")
+        error_sub_label.setStringValue_("Please check your UUID and Bluetooth connection")
         error_sub_label.setBezeled_(False)
         error_sub_label.setDrawsBackground_(False)
         error_sub_label.setEditable_(False)
