@@ -116,9 +116,9 @@ class Server(NSObject):
                 f"Server ready on {constants.SERVER_HOST}:{constants.SERVER_PORT}"
             )
             self._failures = 0
-            self.scheduleHealthCheck()
             if self._app is not None:
                 self._app.checkAndUpdatePopover()
+            self.scheduleHealthCheck()
             return
 
         self._failures += 1
