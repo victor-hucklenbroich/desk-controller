@@ -9,6 +9,7 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
+import constants
 from constants import LOGGER
 from control import config
 from ui import window
@@ -63,13 +64,27 @@ class InitialSetupView(NSView):
         self.uuid_field.setAlignment_(0)
         self.addSubview_(self.uuid_field)
 
-        # Retry button
-        retry_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(154, 5, 75, 27))
-        retry_button.setTitle_("Connect")
-        retry_button.setBezelStyle_(8)
-        retry_button.setTarget_(self)
-        retry_button.setAction_("connect:")
-        self.addSubview_(retry_button)
+        # Connect button
+        connect_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(154, 5, 75, 27))
+        connect_button.setTitle_("Connect")
+        connect_button.setBezelStyle_(8)
+        connect_button.setTarget_(self)
+        connect_button.setAction_("connect:")
+        self.addSubview_(connect_button)
+
+        # Version label
+        version_label = NSTextField.alloc().initWithFrame_(
+            NSMakeRect(20, 8, 90, 16)
+        )
+        version_label.setStringValue_(constants.VERSION)
+        version_label.setBezeled_(False)
+        version_label.setDrawsBackground_(False)
+        version_label.setEditable_(False)
+        version_label.setSelectable_(False)
+        version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
+        version_label.setFont_(NSFont.systemFontOfSize_(12))
+        version_label.setAlignment_(0)
+        self.addSubview_(version_label)
 
         # App Quit button
         quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
