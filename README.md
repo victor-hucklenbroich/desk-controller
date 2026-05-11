@@ -56,16 +56,19 @@ The App is only tested on Apple Silicon Macs with macOS Tahoe, but there isn't b
 4. **Launch the App**:
 
    `/Applications/DeskController.app`
- 
-![image](./assets/screenshots/startup_view.png) ![image](./assets/screenshots/desk_controller_view.png)
 
 
+5. **Enter your desks UUID**:
+
+![image](./assets/screenshots/welcome_view.png) ![image](./assets/screenshots/startup_view.png) 
+
+6. **Control your desk!**
+
+![image](./assets/screenshots/desk_controller_view.png) 
 
 
 ## Troubleshooting
 Should something go wrong during the execution of the installation script, it's recommended to follow the scripts outputs to find the issue. Likely culprits are a missing, invalid or outdated installation of Python or Homebrew. The linak-controller and PyObjC dependencies should be handled automatically by the script but it's worth checking these manually if necessary. 
-
-
 
 ![image](./assets/screenshots/connection_error_message.png)
 
