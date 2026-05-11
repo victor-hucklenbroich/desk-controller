@@ -1,6 +1,6 @@
 # DeskController Menu Bar App
 
-**Version:** v1.1.0-alpha
+**Version:** v1.0.0
 
 DeskController is a lightweight macOS menu bar application for controlling Linak-based standing desks. DeskController provides a visual interface for linak-controller interactions, allowing bluetooth desk height control.
 
