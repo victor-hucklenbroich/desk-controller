@@ -98,7 +98,7 @@ class SliderView(NSView):
 
         # Version label
         version_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(4, 8, 90, 16)
+            NSMakeRect(20, 8, 90, 16)
         )
         version_label.setStringValue_(constants.VERSION)
         version_label.setBezeled_(False)
@@ -107,7 +107,7 @@ class SliderView(NSView):
         version_label.setSelectable_(False)
         version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
         version_label.setFont_(NSFont.systemFontOfSize_(12))
-        version_label.setAlignment_(2)
+        version_label.setAlignment_(0)
         self.addSubview_(version_label)
 
         # Shortcut buttons for preset heights
