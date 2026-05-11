@@ -1,89 +1,82 @@
-# DeskController
+# DeskController Menu Bar App
 
-**Version:** 1.0.0  
-**Author:** Victor Hucklenbroich
+**Version:** v1.0.0
 
-A lightweight macOS menu bar application for controlling Linak-based standing desks. DeskController provides a visual interface for linak-controller interactions, allowing bluetooth desk height control.
+DeskController is a lightweight macOS menu bar application for controlling Linak-based standing desks. DeskController provides a visual interface for linak-controller interactions, allowing bluetooth desk height control.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 ![Python](https://img.shields.io/badge/python-3.x-blue.svg)
 
-## Dependencies
-
-This application is built on top of [linak-controller](https://github.com/rhyst/linak-controller), an open-source project for controlling Linak standing desk controllers via Bluetooth.
-
 ### Requirements
 
-- macOS
+- macOS 14 Sonoma or later
 - Python 3.x
 - PyObjC (for macOS native UI)
 - Homebrew (recommended for linak-controller installation)
-- linak-controller installed at `/opt/homebrew/anaconda3/bin/linak-controller`
+- linak-controller
+- Desk already paired to your device.
 
-## Installation
+The [install](./install) script will automatically check for a valid Python installation and install Homebrew, PyObjc and linak-controller if they aren't already available. So you only need to pair your Desk if you are following the [Quick Start](#quick-start) guide.
 
-1. **Install linak-controller**:
+
+### Compatibility
+
+The App is only tested on Apple Silicon Macs with macOS Tahoe, but there isn't be any reason why it should not work with older versions of macOS or Intel Macs. Further, DeskController is built on top of [linak-controller](https://github.com/rhyst/linak-controller), an open-source project for controlling Linak standing desk controllers via Bluetooth. Althought the installation script and DeskController in-app settings are designed to automatically handle the linak-controller dependency and its configuration, these can still be the cause of issues (more on this under [Troubleshooting](#troubleshooting)).
+
+ Compatible Desks reported by linak-controller:
+- Ikea Idasen
+- iMovr Lander
+- Linak DPG1C
+- Linak DPG1M
+
+## Quick Start
+1. **Clone the repository**:
    ```bash
-   # Follow instructions at https://github.com/rhyst/linak-controller
-   pip install linak-controller
+   git clone git@github.com:victor-hucklenbroich/desk-controller.git
+   ```
+   or
+   ```bash
+   git clone https://github.com/victor-hucklenbroich/desk-controller.git
    ```
 
+2. **Navigate to the local repository**:
 
-2. **Clone this repository**:
    ```bash
-   git clone https://github.com/yourusername/DeskController.git
-   cd DeskController
+   cd desk-controller
    ```
 
-3. **Install Python dependencies**:
+3. **Run the installation script**:
+
+   (Note: this step might ask you to automatically install the dependencies)
    ```bash
-   pip install pyobjc-core pyobjc-framework-Cocoa
-   ```
-4. **Build the application** (using PyInstaller):
-   ```bash
-   ./build_app
+   ./install
    ```
    
-   The built application will be available in the `dist/` directory.
+4. **Launch the App**:
 
-5. **Run the application**:
-   - Copy `DeskController.app` from `dist/` to your Applications folder
-   - Launch DeskController
+   `/Applications/DeskController.app`
 
-## Usage
 
-1. **Show popover**: Click the DeskController icon in your menu bar
-2. **Adjust Height**: 
-   - Drag the slider to your desired height and release
-   - Click "Sit" for 75cm preset
-   - Click "Stand" for 120cm preset
-3. **Monitor**: Current desk height is displayed in the menu bar (e.g., `|‾‾‾| 75cm`)
-4. **Quit**: Click the "Quit" button in the popover
+5. **Enter your desks UUID**:
 
-## Configuration
+![image](./assets/screenshots/welcome_view.png) ![image](./assets/screenshots/startup_view.png) 
 
-The application expects linak-controller to be installed at:
-```
-/opt/homebrew/anaconda3/bin/linak-controller
-```
+6. **Control your desk!**
 
-To change this path, modify the `LINAK` constant in the source code:
-```python
-LINAK: str = "/your/custom/path/to/linak-controller"
-```
-The linak-controller `config.yaml` also needs to be configured with the correct UUID.
+![image](./assets/screenshots/desk_controller_view.png) 
 
-## Logging
 
-Logs are written to:
-```
-~/Library/Logs/DeskController.log
-```
+## Troubleshooting
+Should something go wrong during the execution of the installation script, it's recommended to follow the scripts outputs to find the issue. Likely culprits are a missing, invalid or outdated installation of Python or Homebrew. The linak-controller and PyObjC dependencies should be handled automatically by the script but it's worth checking these manually if necessary. 
 
-This includes command execution, status, and errors.
+![image](./assets/screenshots/connection_error_message.png)
 
-## Acknowledgments
+If the DeskController App is not launching properly there is a prelaunch error log available at `~/Library/Logs/DeskController_error.log`. Most common issues are problems with linak-controller and its config, the provided UUID of your desk, or the Bluetooth connection between your Mac and desk. Before proceeding double check that DeskController can find your linak-controller path and config file (`~/Library/Application Support/linak-controller/config.yaml`). This is where DeskController is looking for the UUID of your desk. Also make sure the UUID is correct, and you can connect to your desk via Bluetooth.  If you are still facing issues, check the runtime logs located at `~/Library/Logs/DeskController.log`. At this point you might also want to check the DeskController and linak-controller source code.
+
+## Uninstall
+If you do not like DeskController you can remove it easily with the [uninstall](./uninstall) script, analogous in execution to the install script. This will only leave the cloned repository, which you can delete manually.
+
+## Acknowledgements
 
 - Built with [linak-controller](https://github.com/rhyst/linak-controller) by [rhyst](https://github.com/rhyst)
-
