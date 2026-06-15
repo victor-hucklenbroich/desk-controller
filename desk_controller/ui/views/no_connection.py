@@ -40,7 +40,7 @@ class NoConnectionView(NSView):
         error_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(38, 78, 295, 30)
         )
-        error_label.setStringValue_("⚠ Could not connect to your Desk!")
+        error_label.setStringValue_("Could not connect to your Desk!")
         error_label.setBezeled_(False)
         error_label.setDrawsBackground_(False)
         error_label.setEditable_(False)

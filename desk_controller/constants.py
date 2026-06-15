@@ -77,12 +77,13 @@ HEALTH_CHECK_INTERVAL: float = 5.0
 
 # --- UI Constants ---
 ICON_SIZE = 22
-ICON_SPRITES = []
+ICON_FRAMES = []
 for i in range(15):
     icon_path = os.path.join(base_path, "assets", "sprites", f"icon_{i}.png")
     icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
     icon.setSize_(NSSize(ICON_SIZE, ICON_SIZE))
     icon.setTemplate_(True)
-    ICON_SPRITES.append(icon)
+    ICON_FRAMES.append(icon)
+SPINNER_FRAMES = ["◴", "◷", "◶", "◵"]
 
 MONO_FONT = NSFont.monospacedDigitSystemFontOfSize_weight_(13, 0)

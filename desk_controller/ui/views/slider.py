@@ -153,10 +153,10 @@ class SliderView(NSView):
         )
         status_item.button().setAttributedTitle_(attr_title)
 
-        # icon sprite update
+        # icon frame update
         normalized = (height_value - constants.MIN_HEIGHT) / (constants.MAX_HEIGHT - constants.MIN_HEIGHT)
-        sprite_index = max(0, min(14, round(normalized * 14)))
-        status_item.button().setImage_(constants.ICON_SPRITES[sprite_index])
+        frame_index = max(0, min(14, round(normalized * 14)))
+        status_item.button().setImage_(constants.ICON_FRAMES[frame_index])
 
         # slider update
         if move_slider_handle:
@@ -210,6 +210,7 @@ class SliderView(NSView):
     def syncTransitionUI_(self, data):
         """Objective-C selector to update UI elements on the Main Thread."""
         val = round(data["val"])
+        self.app.current_height = val
         SliderView.updateUI(self.app.status_item, self.slider, val, data["move_slider"])
 
     def setUIState_(self, enabled):
