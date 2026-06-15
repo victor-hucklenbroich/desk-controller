@@ -15,6 +15,7 @@ from ui.views.connecting import EstablishingConnectionView
 from ui.views.setup import InitialSetupView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
+from ui.views.settings import SettingsView
 from control.server import Server
 from constants import LOGGER
 import constants
@@ -63,6 +64,7 @@ class MenuBarApp(NSObject):
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None
+            self.settings_window = None
             self.current_content = None
             self.is_visible = False
 
@@ -156,6 +158,32 @@ class MenuBarApp(NSObject):
 
         self.popover_window.setContentView_(content_view)
         self.current_content = required
+
+    def openSettings(self):
+        """Opens the standalone, centered settings window."""
+        self.hidePopover()
+        if self.settings_window is None:
+            rect = NSMakeRect(0, 0, 364, 300)
+            self.settings_window = KeyableWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+                rect,
+                NSWindowStyleMaskBorderless,
+                NSBackingStoreBuffered,
+                False
+            )
+            self.settings_window.setOpaque_(False)
+            self.settings_window.setBackgroundColor_(NSColor.clearColor())
+            self.settings_window.setLevel_(3)
+
+        # Rebuild the view so the fields reflect the current config.
+        self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
+        self.settings_window.center()
+        Cocoa.NSApp.activateIgnoringOtherApps_(True)
+        self.settings_window.makeKeyAndOrderFront_(None)
+
+    def closeSettings(self):
+        """Hides the settings window."""
+        if self.settings_window:
+            self.settings_window.orderOut_(None)
 
     def quit(self):
         if hasattr(self, "server"):

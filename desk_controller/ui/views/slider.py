@@ -15,7 +15,6 @@ from Foundation import NSObject, NSMakeRect
 import constants
 from constants import LOGGER
 from control.process import Controller
-from desk_controller.constants import CONFIG_SIT, CONFIG_STAND
 from ui import window
 
 
@@ -125,6 +124,9 @@ class SliderView(NSView):
         self.stand_button.setAction_("shortcutStand:")
         self.addSubview_(self.stand_button)
 
+        # Settings button
+        self.addSubview_(window.make_settings_button(self, NSMakeRect(256, 5, 33, 27)))
+
         # App Quit button
         quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
         quit_button.setTitle_("Quit")
@@ -132,6 +134,11 @@ class SliderView(NSView):
         quit_button.setTarget_(self)
         quit_button.setAction_("quitApp:")
         self.addSubview_(quit_button)
+
+    def openSettings_(self, sender):
+        """Opens the settings window."""
+        LOGGER.debug("Settings button pressed")
+        self.app.openSettings()
 
     def drawRect_(self, rect):
         window.draw_rect(rect)
@@ -223,12 +230,12 @@ class SliderView(NSView):
     def shortcutSit_(self, sender):
         """Action for Sit button."""
         LOGGER.debug("Sit shortcut button pressed")
-        self.startTransition_(CONFIG_SIT, move_slider_handle=True)
+        self.startTransition_(constants.CONFIG_SIT, move_slider_handle=True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
         LOGGER.debug("Stand shortcut button pressed")
-        self.startTransition_(CONFIG_STAND, move_slider_handle=True)
+        self.startTransition_(constants.CONFIG_STAND, move_slider_handle=True)
 
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""

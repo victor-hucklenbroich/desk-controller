@@ -100,6 +100,9 @@ class NoConnectionView(NSView):
         retry_button.setAction_("retry:")
         self.addSubview_(retry_button)
 
+        # Settings button
+        self.addSubview_(window.make_settings_button(self, NSMakeRect(245, 5, 33, 27)))
+
         # App Quit button
         quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
         quit_button.setTitle_("Quit")
@@ -107,6 +110,11 @@ class NoConnectionView(NSView):
         quit_button.setTarget_(self)
         quit_button.setAction_("quitApp:")
         self.addSubview_(quit_button)
+
+    def openSettings_(self, sender):
+        """Opens the settings window."""
+        LOGGER.debug("Settings button pressed")
+        self.app.openSettings()
 
     def drawRect_(self, rect):
         window.draw_rect(rect)
