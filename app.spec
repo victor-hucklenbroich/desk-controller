@@ -49,6 +49,7 @@ app = BUNDLE(
     icon='assets/icon/app_icon.icns',
     bundle_identifier='com.victorhucklenbroich.DeskController',
     info_plist={
+        'LSMinimumSystemVersion': '14.0', # Sonoma
         'NSPrincipalClass': 'NSApplication',
         'NSHighResolutionCapable': 'True',
         'LSUIElement': 'True'
