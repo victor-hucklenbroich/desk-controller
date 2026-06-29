@@ -125,7 +125,7 @@ class SliderView(NSView):
         self.addSubview_(self.stand_button)
 
         # Settings button
-        self.addSubview_(window.make_settings_button(self, NSMakeRect(256, 5, 33, 27)))
+        self.addSubview_(window.make_settings_button(self, NSMakeRect(257, 5, 37, 27)))
 
         # App Quit button
         quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
