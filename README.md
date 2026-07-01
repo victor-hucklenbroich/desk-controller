@@ -55,19 +55,17 @@ The App is only tested on Apple Silicon Macs with macOS Tahoe. DeskController is
 
 ### Build from source
 
-Developers can build and install locally instead of using the cask:
+Developers can build locally instead of using the cask:
 
 ```bash
 git clone https://github.com/victor-hucklenbroich/desk-controller.git
 cd desk-controller
-./install
+pyinstaller app.spec
 ```
-
-The [install](./install) script checks for a valid Python installation and installs Homebrew, PyObjC, and linak-controller if they aren't already available.
 
 
 ## Troubleshooting
-If something goes wrong during installation, check the output of `brew install` (or the install script, if you built from source) to find the issue. A likely culprit is a missing or outdated Homebrew installation. The linak-controller dependency should be handled automatically, but it's worth checking it manually if necessary. 
+If something goes wrong during installation, check the output of `brew install` to find the issue. A likely culprit is a missing or outdated Homebrew installation. The linak-controller dependency should be handled automatically, but it's worth checking it manually if necessary. 
 
 ![image](./assets/screenshots/connection_error_message.png)
 
