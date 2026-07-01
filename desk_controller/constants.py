@@ -47,7 +47,7 @@ LINAK_PATH = _find_linak_controller()
 
 
 # --- Static Constants ---
-VERSION: str = "v1.0.0"
+VERSION: str = "v1.1.0"
 MIN_HEIGHT: int = 63
 MAX_HEIGHT: int = 127
 FAILURE_MARKERS: tuple = ("Traceback", "Something unexpected went wrong")
