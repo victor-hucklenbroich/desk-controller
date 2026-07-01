@@ -118,7 +118,7 @@ class Server(NSObject):
             self._failures = 0
             if self._app is not None:
                 self._app.checkAndUpdatePopover()
-            self.scheduleHealthCheck()
+            self._scheduleHealthCheck()
             return
 
         self._failures += 1

@@ -5,7 +5,8 @@ from AppKit import (
     NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
     NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
     NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
-    NSAttributedString, NSFontAttributeName
+    NSAttributedString, NSFontAttributeName, NSProgressIndicator,
+    NSProgressIndicatorStyleSpinning, NSControlSizeSmall
 )
 from Foundation import NSObject, NSMakeRect
 
@@ -35,9 +36,18 @@ class EstablishingConnectionView(NSView):
 
     def buildUI(self):
         """Initializes and positions all UI elements within the popover."""
-        # Error label
+        spinner = NSProgressIndicator.alloc().initWithFrame_(
+            NSMakeRect(185, 30, 18, 18)
+        )
+        spinner.setStyle_(NSProgressIndicatorStyleSpinning)
+        spinner.setControlSize_(NSControlSizeSmall)
+        spinner.setDisplayedWhenStopped_(False)
+        spinner.startAnimation_(None)
+        self.addSubview_(spinner)
+
+        # Title label
         error_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(38, 40, 295, 50)
+            NSMakeRect(95, 50, 210, 30)
         )
         error_label.setStringValue_("Connecting to your Desk...")
         error_label.setBezeled_(False)
@@ -46,21 +56,8 @@ class EstablishingConnectionView(NSView):
         error_label.setSelectable_(False)
         error_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.6))
         error_label.setFont_(NSFont.systemFontOfSize_(15))
-        error_label.setAlignment_(1)
+        error_label.setAlignment_(0)
         self.addSubview_(error_label)
-
-        error_sub_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(38, 18, 295, 50)
-        )
-        error_sub_label.setStringValue_("Please wait")
-        error_sub_label.setBezeled_(False)
-        error_sub_label.setDrawsBackground_(False)
-        error_sub_label.setEditable_(False)
-        error_sub_label.setSelectable_(False)
-        error_sub_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.6))
-        error_sub_label.setFont_(NSFont.systemFontOfSize_(13))
-        error_sub_label.setAlignment_(1)
-        self.addSubview_(error_sub_label)
 
         # Version label
         version_label = NSTextField.alloc().initWithFrame_(

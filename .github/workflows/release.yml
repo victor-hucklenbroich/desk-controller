@@ -1,0 +1,101 @@
+# Pushing a tag like v1.2.3 builds, signs, and notarizes DeskController.app,
+# publishes the zip as a GitHub Release, and bumps the cask in the
+# victor-hucklenbroich/homebrew-tap repo.
+#
+# Required repository secrets:
+#   MACOS_CERT_P12
+#   MACOS_CERT_PASSWORD
+#   APPLE_ID
+#   APPLE_TEAM_ID
+#   APPLE_APP_SPECIFIC_PASSWORD
+#   TAP_GITHUB_TOKEN
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read app version and check it matches the tag
+        run: |
+          VERSION="$(python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('desk_controller/constants.py').read_text()).group(1))")"
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION v$VERSION in desk_controller/constants.py" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: pip install pyinstaller pyobjc linak-controller
+
+      - name: Import Developer ID certificate into a temporary keychain
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" \
+            -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
+          # Allow codesign to use the key non-interactively (no UI on a runner).
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          SIGN_ID="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | awk -F'"' '/Developer ID Application/{print $2; exit}')"
+          [ -n "$SIGN_ID" ] || { echo "No Developer ID Application identity found in the imported .p12" >&2; exit 1; }
+          echo "SIGN_ID=$SIGN_ID" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize, staple, package
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: ./release/build_release.sh
+
+      - name: Create GitHub release with the zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP="dist/DeskController-${VERSION}.zip"
+          # If the release for this tag was already created by hand, just attach the asset.
+          gh release create "$GITHUB_REF_NAME" "$ZIP" \
+            --verify-tag --title "$GITHUB_REF_NAME" --generate-notes \
+            || gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
+
+      - name: Check out homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: victor-hucklenbroich/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: tap
+
+      - name: Bump cask version and sha256
+        run: |
+          SHA="$(shasum -a 256 "dist/DeskController-${VERSION}.zip" | cut -d' ' -f1)"
+          sed -i '' \
+            -e "s/^  version .*/  version \"${VERSION}\"/" \
+            -e "s/^  sha256 .*/  sha256 \"${SHA}\"/" \
+            tap/Casks/desk-controller.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/desk-controller.rb
+          git commit -m "desk-controller ${VERSION}"
+          git push

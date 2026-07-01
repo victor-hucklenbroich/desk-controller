@@ -11,6 +11,21 @@ from Foundation import NSObject, NSMakeRect
 from constants import LOGGER
 
 
+def make_settings_button(target, frame):
+    """Builds a gear icon button wired to the target's `openSettings:` action."""
+    button = Cocoa.NSButton.alloc().initWithFrame_(frame)
+    gear = NSImage.imageWithSystemSymbolName_accessibilityDescription_("gearshape", "Settings")
+    if gear is not None:
+        button.setImage_(gear)
+        button.setImagePosition_(1)  # NSImageOnly
+    else:
+        button.setTitle_("⚙")
+    button.setBezelStyle_(8)
+    button.setTarget_(target)
+    button.setAction_("openSettings:")
+    return button
+
+
 def draw_rect(rect):
     """Custom drawing code for the view's background and border."""
     try:

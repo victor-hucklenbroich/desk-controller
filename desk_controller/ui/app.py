@@ -9,13 +9,15 @@ from AppKit import (
     NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
     NSAttributedString, NSFontAttributeName
 )
-from Foundation import NSObject, NSMakeRect
+from Foundation import NSObject, NSMakeRect, NSTimer
 
 from ui.views.connecting import EstablishingConnectionView
 from ui.views.setup import InitialSetupView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
+from ui.views.settings import SettingsView
 from control.server import Server
+from control.process import _TimerProxy
 from constants import LOGGER
 import constants
 
@@ -50,9 +52,17 @@ class MenuBarApp(NSObject):
                 NSVariableStatusItemLength
             )
 
-            SliderView.updateUI(self.status_item, None, 75, False) # initial UI state
+            self.current_height = 75
+            self._spinner_timer = None
+            self._spinner_proxy = None
+            self._spinner_index = 0
             self.status_item.button().setTarget_(self)
             self.status_item.button().setAction_("togglePopover:")
+
+            if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
+                self._updateStatusItem(ContentViews.SETUP)
+            else:
+                self._updateStatusItem(ContentViews.CONNECTING)
             LOGGER.debug("Status bar item created")
 
             self.server = Server.alloc().initWithCommand_(
@@ -63,6 +73,7 @@ class MenuBarApp(NSObject):
             LOGGER.info(f"Server started, running: {self.server.is_running()}")
 
             self.popover_window = None
+            self.settings_window = None
             self.current_content = None
             self.is_visible = False
 
@@ -94,6 +105,7 @@ class MenuBarApp(NSObject):
             self.popover_window.setLevel_(3)
 
         self.checkAndUpdatePopover()
+        self._renderContentView(self.current_content)
 
         # Calculate position relative to the status item
         button_frame = self.status_item.button().window().frame()
@@ -132,8 +144,10 @@ class MenuBarApp(NSObject):
                 self.hidePopover()
 
     def checkAndUpdatePopover(self):
-        """Swap the popover content view if the server state changed."""
-        if self.server.is_dead():
+        """Reflect the current server state in the menu bar and popover."""
+        if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
+            required = ContentViews.SETUP
+        elif self.server.is_dead():
             required = ContentViews.NOCON
         elif self.server.is_healthy():
             required = ContentViews.SLIDER
@@ -141,21 +155,117 @@ class MenuBarApp(NSObject):
             required = ContentViews.CONNECTING
 
         if required == self.current_content:
-            return  # already showing the right view
+            return
 
-        if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
-            content_view = InitialSetupView.alloc().initWithApp_(self)
-            required = ContentViews.SETUP
-        else:
-            if required == ContentViews.NOCON:
-                content_view = NoConnectionView.alloc().initWithApp_(self)
-            elif required == ContentViews.SLIDER:
-                content_view = SliderView.alloc().initWithApp_(self)
-            else:
-                content_view = EstablishingConnectionView.alloc().initWithApp_(self)
-
-        self.popover_window.setContentView_(content_view)
         self.current_content = required
+        self._updateStatusItem(required)
+
+        if self.popover_window is not None:
+            self._renderContentView(required)
+
+    @objc.python_method
+    def _renderContentView(self, state):
+        """Builds and installs the popover content view for the given state."""
+        if state == ContentViews.SETUP:
+            content_view = InitialSetupView.alloc().initWithApp_(self)
+        elif state == ContentViews.NOCON:
+            content_view = NoConnectionView.alloc().initWithApp_(self)
+        elif state == ContentViews.SLIDER:
+            content_view = SliderView.alloc().initWithApp_(self)
+        else:
+            content_view = EstablishingConnectionView.alloc().initWithApp_(self)
+        self.popover_window.setContentView_(content_view)
+
+    @objc.python_method
+    def _deskFrame(self):
+        """Returns the desk icon sprite matching the last known height."""
+        span = constants.MAX_HEIGHT - constants.MIN_HEIGHT
+        normalized = (self.current_height - constants.MIN_HEIGHT) / span
+        index = max(0, min(14, round(normalized * 14)))
+        return constants.ICON_FRAMES[index]
+
+    @objc.python_method
+    def _updateStatusItem(self, state):
+        """Updates the menu bar icon/title to reflect the connection state."""
+        button = self.status_item.button()
+        button.setImage_(self._deskFrame())
+        button.setImagePosition_(2)
+
+        if state == ContentViews.CONNECTING:
+            self._startStatusSpinner()
+            return
+
+        self._stopStatusSpinner()
+        if state == ContentViews.NOCON:
+            button.setAttributedTitle_(
+                NSAttributedString.alloc().initWithString_attributes_(
+                    " ⚠︎", {NSFontAttributeName: constants.MONO_FONT}
+                )
+            )
+        elif state == ContentViews.SETUP:
+            button.setImagePosition_(1)
+            button.setAttributedTitle_(NSAttributedString.alloc().initWithString_(""))
+        else: # SLIDER
+            SliderView.updateUI(self.status_item, None, self.current_height, False)
+
+    @objc.python_method
+    def _startStatusSpinner(self):
+        """Animates a spinner glyph in the menu bar while connecting."""
+        if self._spinner_timer is not None:
+            return # already spinning
+        self._spinner_index = 0
+        self._renderSpinnerFrame()
+        self._spinner_proxy = _TimerProxy.alloc().initWithCallback_(self._renderSpinnerFrame)
+        self._spinner_timer = (
+            NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                0.15, self._spinner_proxy, "fire:", None, True
+            )
+        )
+
+    @objc.python_method
+    def _renderSpinnerFrame(self):
+        button = self.status_item.button()
+        frames = constants.SPINNER_FRAMES
+        glyph = frames[self._spinner_index % len(frames)]
+        self._spinner_index += 1
+        button.setAttributedTitle_(
+            NSAttributedString.alloc().initWithString_attributes_(
+                " " + glyph, {NSFontAttributeName: constants.MONO_FONT}
+            )
+        )
+
+    @objc.python_method
+    def _stopStatusSpinner(self):
+        if self._spinner_timer is not None:
+            self._spinner_timer.invalidate()
+            self._spinner_timer = None
+        self._spinner_proxy = None
+
+    def openSettings(self):
+        """Opens the standalone, centered settings window."""
+        self.hidePopover()
+        if self.settings_window is None:
+            rect = NSMakeRect(0, 0, 364, 300)
+            self.settings_window = KeyableWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+                rect,
+                NSWindowStyleMaskBorderless,
+                NSBackingStoreBuffered,
+                False
+            )
+            self.settings_window.setOpaque_(False)
+            self.settings_window.setBackgroundColor_(NSColor.clearColor())
+            self.settings_window.setLevel_(3)
+
+        # Rebuild the view so the fields reflect the current config.
+        self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
+        self.settings_window.center()
+        Cocoa.NSApp.activateIgnoringOtherApps_(True)
+        self.settings_window.makeKeyAndOrderFront_(None)
+
+    def closeSettings(self):
+        """Hides the settings window."""
+        if self.settings_window:
+            self.settings_window.orderOut_(None)
 
     def quit(self):
         if hasattr(self, "server"):

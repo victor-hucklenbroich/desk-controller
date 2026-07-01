@@ -36,13 +36,20 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger(__name__)
 
+def _find_linak_controller() -> str:
+    for path in ("/opt/homebrew/bin/linak-controller", # Apple Silicon
+                 "/usr/local/bin/linak-controller"): # Intel
+        if os.path.exists(path):
+            return path
+    return shutil.which("linak-controller") or ""
+
+LINAK_PATH = _find_linak_controller()
+
 
 # --- Static Constants ---
-VERSION: str = "v1.0.0"
+VERSION: str = "v1.1.0"
 MIN_HEIGHT: int = 63
 MAX_HEIGHT: int = 127
-LINAK_PATH = shutil.which("linak-controller") or "/opt/homebrew/anaconda3/bin/linak-controller"
-MOVE_CMD: str = LINAK_PATH + " --forward --move-to "
 FAILURE_MARKERS: tuple = ("Traceback", "Something unexpected went wrong")
 
 # --- Preference constants ---
@@ -77,12 +84,13 @@ HEALTH_CHECK_INTERVAL: float = 5.0
 
 # --- UI Constants ---
 ICON_SIZE = 22
-ICON_SPRITES = []
+ICON_FRAMES = []
 for i in range(15):
     icon_path = os.path.join(base_path, "assets", "sprites", f"icon_{i}.png")
     icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
     icon.setSize_(NSSize(ICON_SIZE, ICON_SIZE))
     icon.setTemplate_(True)
-    ICON_SPRITES.append(icon)
+    ICON_FRAMES.append(icon)
+SPINNER_FRAMES = ["◴", "◷", "◶", "◵"]
 
 MONO_FONT = NSFont.monospacedDigitSystemFontOfSize_weight_(13, 0)

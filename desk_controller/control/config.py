@@ -28,8 +28,8 @@ class ConfigParser:
 
         config = ConfigParser.parse()
         config["mac_address"] = str(constants.CONFIG_UUID)
-        config["favourites"]["sit"] = int(constants.CONFIG_SIT)
-        config["favourites"]["stand"] = int(constants.CONFIG_STAND)
+        config["favourites"]["sit"] = int(constants.CONFIG_SIT) * 10
+        config["favourites"]["stand"] = int(constants.CONFIG_STAND) * 10
         with open(constants.CONFIG_FILE_PATH, 'w') as out:
             yaml.safe_dump(config, out, default_flow_style=False)
         time.sleep(0.2)
