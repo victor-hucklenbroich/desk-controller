@@ -10,6 +10,7 @@ from bleak import BleakClient
 
 import constants
 from constants import LOGGER
+from control.config import ConfigParser
 from control.linak.desk import Desk
 from control.linak.util import Height
 
@@ -47,6 +48,7 @@ class DeskService(NSObject):
         self._suspended = False   # system sleep in progress
         self._closing = False
         self._was_moving = False
+        self._max_seen_mm = 0.0
         self._observing_workspace = False
         return self
 
@@ -111,7 +113,7 @@ class DeskService(NSObject):
             if on_done is not None:
                 on_done(False)
             return
-        target_cm = max(constants.MIN_HEIGHT, min(constants.MAX_HEIGHT, int(target_cm)))
+        target_cm = max(constants.MIN_HEIGHT, min(constants.MAX_HEIGHT, float(target_cm)))
         future = asyncio.run_coroutine_threadsafe(self._do_move(target_cm), self._loop)
 
         def _completed(fut):
@@ -196,6 +198,7 @@ class DeskService(NSObject):
                     await desk.start_watching()
                     self._client = client
                     self._desk = desk
+                    self._max_seen_mm = 0.0
 
                     # Initial height so slider/display don't sit on a default
                     height = desk.latest_height
@@ -203,6 +206,11 @@ class DeskService(NSObject):
                     if height is None:
                         height, speed = await desk.get_height_speed()
                     LOGGER.info(f"Connected to desk at {height.human}mm")
+
+                    base_mm = float(desk.config["base_height"])
+                    max_mm = max(constants.MAX_HEIGHT * 10.0, float(height.human))
+                    AppHelper.callAfter(self._applyLimits, base_mm, max_mm)
+
                     self._push_height(height, speed)
                     self._request_state(DeskState.CONNECTED)
                     return
@@ -261,11 +269,13 @@ class DeskService(NSObject):
         desk = self._desk
         if desk is None:
             return False
-        target = Height(target_cm * 10, desk.config["base_height"], True)
+        # The desk works in mm, the UI in cm; convert without losing precision
+        target_mm = int(round(target_cm * 10))
+        target = Height(target_mm, desk.config["base_height"], True)
         if target.value < 0 or target.value > 65535:
             LOGGER.warning(f"Target height {target_cm}cm is out of range for this desk")
             return False
-        LOGGER.info(f"Moving desk to {target_cm}cm")
+        LOGGER.info(f"Moving desk to {target_mm}mm")
         await desk.move_to(target)
         return True
 
@@ -290,19 +300,59 @@ class DeskService(NSObject):
 
     @objc.python_method
     def _push_height(self, height, speed):
-        cm = int(round(height.human / 10.0))
+        mm = float(height.human)
+        cm = int(round(mm / 10.0))
         moving = bool(speed is not None and speed.value != 0)
+        if mm > self._max_seen_mm:
+            self._max_seen_mm = mm
         if moving != self._was_moving:
             self._was_moving = moving
             LOGGER.info(
                 f"Desk movement {'started' if moving else 'stopped'} at {cm}cm"
             )
+            # The desk clamps at its physical top, so any height report above
+            # the known maximum proves a larger range; adopt it once the desk
+            # has stopped moving
+            if not moving and self._max_seen_mm > constants.MAX_HEIGHT * 10.0 + 0.5:
+                AppHelper.callAfter(self._applyLimits, None, self._max_seen_mm)
         AppHelper.callAfter(self._notifyHeight, cm, moving)
 
     @objc.python_method
     def _notifyHeight(self, cm, moving):
         if self._app is not None and not self._closing:
             self._app.deskHeightChanged(cm, moving)
+
+    @objc.python_method
+    def _applyLimits(self, base_mm, max_mm):
+        """Adopt desk-derived height limits. Main thread only. MIN mirrors the
+        desk's base offset; MAX only ever grows and is persisted to config."""
+        changed = False
+        if base_mm is not None:
+            min_cm = base_mm / 10.0
+            if abs(min_cm - constants.MIN_HEIGHT) > 0.01:
+                constants.MIN_HEIGHT = min_cm
+                changed = True
+        if max_mm is not None:
+            max_cm = max_mm / 10.0
+            if max_cm > constants.MAX_HEIGHT + 0.01:
+                constants.MAX_HEIGHT = max_cm
+                try:
+                    ConfigParser.update_max_height(int(round(max_mm)))
+                except Exception as e:
+                    LOGGER.warning(f"Could not persist max height: {e}")
+                changed = True
+        if constants.MAX_HEIGHT <= constants.MIN_HEIGHT:
+            # Nonsensical combination (e.g. bad config override)
+            # keep the slider usable with a typical 65cm travel.
+            constants.MAX_HEIGHT = constants.MIN_HEIGHT + 65.0
+            changed = True
+        if changed:
+            LOGGER.info(
+                f"Desk height limits now "
+                f"{constants.MIN_HEIGHT:.1f}-{constants.MAX_HEIGHT:.1f}cm"
+            )
+            if self._app is not None:
+                self._app.deskLimitsChanged()
 
     # --- State handling ---
 

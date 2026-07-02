@@ -69,31 +69,31 @@ class SliderView(NSView):
         self.addSubview_(self.slider)
 
         # Labels for min/max height range
-        min_label = NSTextField.alloc().initWithFrame_(
+        self.min_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(12, 90, 50, 16)
         )
-        min_label.setStringValue_("60cm")
-        min_label.setBezeled_(False)
-        min_label.setDrawsBackground_(False)
-        min_label.setEditable_(False)
-        min_label.setSelectable_(False)
-        min_label.setTextColor_(NSColor.whiteColor())
-        min_label.setFont_(NSFont.systemFontOfSize_(12))
-        min_label.setAlignment_(2)
-        self.addSubview_(min_label)
+        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f}cm")
+        self.min_label.setBezeled_(False)
+        self.min_label.setDrawsBackground_(False)
+        self.min_label.setEditable_(False)
+        self.min_label.setSelectable_(False)
+        self.min_label.setTextColor_(NSColor.whiteColor())
+        self.min_label.setFont_(NSFont.systemFontOfSize_(12))
+        self.min_label.setAlignment_(2)
+        self.addSubview_(self.min_label)
 
-        max_label = NSTextField.alloc().initWithFrame_(
+        self.max_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(292, 90, 50, 16)
         )
-        max_label.setStringValue_("130cm")
-        max_label.setBezeled_(False)
-        max_label.setDrawsBackground_(False)
-        max_label.setEditable_(False)
-        max_label.setSelectable_(False)
-        max_label.setTextColor_(NSColor.whiteColor())
-        max_label.setFont_(NSFont.systemFontOfSize_(12))
-        max_label.setAlignment_(2)
-        self.addSubview_(max_label)
+        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f}cm")
+        self.max_label.setBezeled_(False)
+        self.max_label.setDrawsBackground_(False)
+        self.max_label.setEditable_(False)
+        self.max_label.setSelectable_(False)
+        self.max_label.setTextColor_(NSColor.whiteColor())
+        self.max_label.setFont_(NSFont.systemFontOfSize_(12))
+        self.max_label.setAlignment_(2)
+        self.addSubview_(self.max_label)
 
         # Version label
         version_label = NSTextField.alloc().initWithFrame_(
@@ -168,6 +168,14 @@ class SliderView(NSView):
         self.slider.setEnabled_(enabled)
         self.sit_button.setEnabled_(enabled)
         self.stand_button.setEnabled_(enabled)
+
+    @objc.python_method
+    def updateLimits(self):
+        """Applies the current desk-derived height limits to slider and labels."""
+        self.slider.setMinValue_(constants.MIN_HEIGHT)
+        self.slider.setMaxValue_(constants.MAX_HEIGHT)
+        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f}cm")
+        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f}cm")
 
     def sliderChanged_(self, sender):
         """Action for slider movements (empty, action is triggered upon release)."""

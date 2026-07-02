@@ -199,6 +199,12 @@ class MenuBarApp(NSObject):
         )
 
     @objc.python_method
+    def deskLimitsChanged(self):
+        """Desk-derived height limits changed; refresh the slider bounds."""
+        if self.slider_view is not None:
+            self.slider_view.updateLimits()
+
+    @objc.python_method
     def beginMove(self, target_cm, move_slider_handle):
         """Kicks off a desk move; the UI is re-enabled once the desk reports
         the move has finished."""

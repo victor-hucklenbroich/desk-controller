@@ -56,6 +56,10 @@ class Desk:
             if resp:
                 base_height = struct.unpack("<H", resp[1:])[0] / 10
                 desk.config["base_height"] = base_height
+            if desk.config["base_height"] is None:
+                # Desk did not answer: assume a typical frame rather than crash
+                logger.log("Could not read base height from desk; assuming 620mm")
+                desk.config["base_height"] = 620
         else:
             desk.config["base_height"] = config["base_height"]
         logger.log("Base height:{:4.0f}mm".format(desk.config["base_height"]))

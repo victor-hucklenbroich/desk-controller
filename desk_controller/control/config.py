@@ -32,3 +32,11 @@ class ConfigParser:
         with open(constants.CONFIG_FILE_PATH, 'w') as out:
             yaml.safe_dump(config, out, default_flow_style=False)
         LOGGER.info("Updated config.yaml with updated preferences")
+
+    @staticmethod
+    def update_max_height(max_height_mm: int):
+        config = ConfigParser.parse()
+        config["max_height"] = int(max_height_mm)
+        with open(constants.CONFIG_FILE_PATH, 'w') as out:
+            yaml.safe_dump(config, out, default_flow_style=False)
+        LOGGER.info(f"Persisted learned max height of {max_height_mm}mm")

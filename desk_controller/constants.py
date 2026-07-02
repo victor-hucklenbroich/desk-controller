@@ -36,9 +36,12 @@ LOGGER = logging.getLogger(__name__)
 
 # --- Static Constants ---
 VERSION: str = "v1.1.1"
-MIN_HEIGHT: int = 63
-MAX_HEIGHT: int = 127
 PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
+
+# --- Desk height limits (cm, floats for mm precision) ---
+# Defaults match a typical Idasen (620-1270mm) and are refined per desk
+MIN_HEIGHT: float = 62.0
+MAX_HEIGHT: float = 127.0
 
 
 # --- Desk connection constants ---
@@ -51,6 +54,7 @@ WAKE_RECONNECT_DELAY: float = 2.0
 DEFAULT_CONFIG: dict = {
     "mac_address": PLACEHOLDER_UUID,
     "presets": {"sit": 750, "stand": 1240},
+    "max_height": 1270,
 }
 
 if not os.path.exists(CONFIG_FILE_PATH):
@@ -76,6 +80,17 @@ CONFIG_STAND: int = int(int(_presets.get("stand", 1240)) / 10)
 CONFIG_BASE_HEIGHT = CONFIG.get("base_height")
 CONNECTION_TIMEOUT: float = float(CONFIG.get("connection_timeout", 10))
 MOVE_COMMAND_PERIOD: float = float(CONFIG.get("move_command_period", 0.4))
+
+if CONFIG_BASE_HEIGHT:
+    MIN_HEIGHT = float(CONFIG_BASE_HEIGHT) / 10.0
+MAX_HEIGHT = float(CONFIG.get("max_height", 1270)) / 10.0
+if MAX_HEIGHT <= MIN_HEIGHT:
+    LOGGER.warning(
+        f"Nonsensical height limits in config "
+        f"({MIN_HEIGHT}cm-{MAX_HEIGHT}cm); using defaults"
+    )
+    MIN_HEIGHT = 62.0
+    MAX_HEIGHT = 127.0
 
 
 # --- UI Constants ---
