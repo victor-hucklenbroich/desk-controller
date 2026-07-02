@@ -3,7 +3,10 @@ analysis = Analysis(
     pathex=['desk_controller'],
     binaries=[],
     datas=[('assets', 'assets')],
-    hiddenimports=['objc', 'Cocoa', 'AppKit', 'Foundation'],
+    hiddenimports=[
+        'objc', 'Cocoa', 'AppKit', 'Foundation',
+        'CoreBluetooth', 'libdispatch', 'bleak',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -52,6 +55,9 @@ app = BUNDLE(
         'LSMinimumSystemVersion': '14.0', # Sonoma
         'NSPrincipalClass': 'NSApplication',
         'NSHighResolutionCapable': 'True',
-        'LSUIElement': 'True'
+        'LSUIElement': 'True',
+        'NSBluetoothAlwaysUsageDescription':
+            'DeskController connects to your Linak desk via Bluetooth to '
+            'read its height and move it.',
     },
 )

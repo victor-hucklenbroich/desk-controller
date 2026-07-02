@@ -16,8 +16,8 @@ from ui.views.setup import InitialSetupView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
 from ui.views.settings import SettingsView
-from control.server import Server
-from control.process import _TimerProxy
+from ui.timer import _TimerProxy
+from control.desk_service import DeskService
 from constants import LOGGER
 import constants
 
@@ -38,7 +38,7 @@ class ContentViews(Enum):
 class MenuBarApp(NSObject):
     """
     The main application class. Manages the system status bar item,
-    the background server lifecycle, and the popover window visibility.
+    the native desk connection lifecycle, and the popover window visibility.
     """
 
     def init(self):
@@ -52,30 +52,27 @@ class MenuBarApp(NSObject):
                 NSVariableStatusItemLength
             )
 
-            self.current_height = 75
+            self.current_height = 75  # placeholder until the desk reports its height
             self._spinner_timer = None
             self._spinner_proxy = None
             self._spinner_index = 0
             self.status_item.button().setTarget_(self)
             self.status_item.button().setAction_("togglePopover:")
 
-            if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
-                self._updateStatusItem(ContentViews.SETUP)
-            else:
-                self._updateStatusItem(ContentViews.CONNECTING)
-            LOGGER.debug("Status bar item created")
-
-            self.server = Server.alloc().initWithCommand_(
-                constants.LINAK_PATH + " --server"
-            )
-            self.server.start()
-            self.server.setApp(self)
-            LOGGER.info(f"Server started, running: {self.server.is_running()}")
-
             self.popover_window = None
             self.settings_window = None
             self.current_content = None
             self.is_visible = False
+            self.slider_view = None
+            self.move_in_progress = False
+            self.move_slider_handle = False
+            self.external_move_active = False
+
+            self.desk = DeskService.alloc().init()
+            self.desk.setApp(self)
+            self.desk.start()
+            self.checkAndUpdatePopover()
+            LOGGER.debug("Status bar item created, desk service started")
 
             LOGGER.debug("MenuBarApp NSObject initialized successfully")
         except Exception as e:
@@ -144,12 +141,12 @@ class MenuBarApp(NSObject):
                 self.hidePopover()
 
     def checkAndUpdatePopover(self):
-        """Reflect the current server state in the menu bar and popover."""
+        """Reflect the current desk connection state in the menu bar and popover."""
         if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
             required = ContentViews.SETUP
-        elif self.server.is_dead():
+        elif self.desk.is_dead():
             required = ContentViews.NOCON
-        elif self.server.is_healthy():
+        elif self.desk.is_healthy():
             required = ContentViews.SLIDER
         else:
             required = ContentViews.CONNECTING
@@ -166,15 +163,66 @@ class MenuBarApp(NSObject):
     @objc.python_method
     def _renderContentView(self, state):
         """Builds and installs the popover content view for the given state."""
+        self.slider_view = None
         if state == ContentViews.SETUP:
             content_view = InitialSetupView.alloc().initWithApp_(self)
         elif state == ContentViews.NOCON:
             content_view = NoConnectionView.alloc().initWithApp_(self)
         elif state == ContentViews.SLIDER:
             content_view = SliderView.alloc().initWithApp_(self)
+            self.slider_view = content_view
         else:
             content_view = EstablishingConnectionView.alloc().initWithApp_(self)
         self.popover_window.setContentView_(content_view)
+
+    @objc.python_method
+    def deskHeightChanged(self, height_cm, moving):
+        """Height report from the desk service: fires while the app moves the
+        desk AND when it is moved externally (physical buttons). Main thread."""
+        self.current_height = height_cm
+
+        # Disable the controls while the desk is moved externally
+        if not self.move_in_progress and moving != self.external_move_active:
+            self.external_move_active = moving
+            if self.slider_view is not None:
+                self.slider_view.setUIState_(not moving)
+
+        if self.current_content != ContentViews.SLIDER:
+            # Status item is showing setup/spinner/warning
+            return
+        # App-initiated moves only drag the slider handle along when requested
+        move_handle = (not self.move_in_progress) or self.move_slider_handle
+        slider = self.slider_view.slider if self.slider_view is not None else None
+        SliderView.updateUI(
+            self.status_item, slider, height_cm,
+            slider is not None and move_handle,
+        )
+
+    @objc.python_method
+    def deskLimitsChanged(self):
+        """Desk-derived height limits changed; refresh the slider bounds."""
+        if self.slider_view is not None:
+            self.slider_view.updateLimits()
+
+    @objc.python_method
+    def beginMove(self, target_cm, move_slider_handle):
+        """Kicks off a desk move; the UI is re-enabled once the desk reports
+        the move has finished."""
+        if self.move_in_progress or self.external_move_active:
+            return
+        self.move_in_progress = True
+        self.move_slider_handle = move_slider_handle
+        if self.slider_view is not None:
+            self.slider_view.setUIState_(False)
+        self.desk.move_to_cm(target_cm, self._moveFinished)
+
+    @objc.python_method
+    def _moveFinished(self, ok):
+        self.move_in_progress = False
+        if self.slider_view is not None:
+            self.slider_view.setUIState_(True)
+        if not ok:
+            LOGGER.warning("Desk move did not complete")
 
     @objc.python_method
     def _deskFrame(self):
@@ -268,8 +316,7 @@ class MenuBarApp(NSObject):
             self.settings_window.orderOut_(None)
 
     def quit(self):
-        if hasattr(self, "server"):
-            if self.server and self.server.is_running():
-                self.server.stop()
+        if hasattr(self, "desk") and self.desk is not None:
+            self.desk.stop()
         LOGGER.info("Terminating application")
         Cocoa.NSApp.terminate_(None)

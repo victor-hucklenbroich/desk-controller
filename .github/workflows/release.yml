@@ -37,7 +37,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install build dependencies
-        run: pip install pyinstaller pyobjc linak-controller
+        run: pip install pyinstaller -r requirements.txt
 
       - name: Import Developer ID certificate into a temporary keychain
         env:

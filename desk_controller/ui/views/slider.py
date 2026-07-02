@@ -1,6 +1,3 @@
-import threading
-import time
-
 import Cocoa
 import objc
 from AppKit import (
@@ -14,7 +11,6 @@ from Foundation import NSObject, NSMakeRect
 
 import constants
 from constants import LOGGER
-from control.process import Controller
 from ui import window
 
 
@@ -36,7 +32,9 @@ class SliderCell(NSSliderCell):
 class SliderView(NSView):
     """
     The main UI view for the desk controller popover.
-    Handles the UI layout, button interactions, and the asynchronous movement transitions.
+    Handles the UI layout and button interactions. Height changes (from app
+    commands or external movements) arrive through the app's height events,
+    so all indicators reflect what the desk actually reports.
     """
 
     def initWithApp_(self, app):
@@ -45,12 +43,14 @@ class SliderView(NSView):
             return None
 
         self.app = app
-        self.current_height = 75  # current desk state for animation logic
         frame = NSMakeRect(0, 0, 364, 120)
         self = self.initWithFrame_(frame)
         self.setWantsLayer_(True)
         self.layer().setCornerRadius_(12)
         self.buildUI()
+
+        if app.move_in_progress or app.external_move_active:
+            self.setUIState_(False)
 
         return self
 
@@ -63,37 +63,37 @@ class SliderView(NSView):
         self.slider.setCell_(custom_cell)
         self.slider.setMinValue_(constants.MIN_HEIGHT)
         self.slider.setMaxValue_(constants.MAX_HEIGHT)
-        self.slider.setDoubleValue_(75)
+        self.slider.setDoubleValue_(self.app.current_height)
         self.slider.setTarget_(self)
         self.slider.setAction_("sliderChanged:")
         self.addSubview_(self.slider)
 
         # Labels for min/max height range
-        min_label = NSTextField.alloc().initWithFrame_(
+        self.min_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(12, 90, 50, 16)
         )
-        min_label.setStringValue_("60cm")
-        min_label.setBezeled_(False)
-        min_label.setDrawsBackground_(False)
-        min_label.setEditable_(False)
-        min_label.setSelectable_(False)
-        min_label.setTextColor_(NSColor.whiteColor())
-        min_label.setFont_(NSFont.systemFontOfSize_(12))
-        min_label.setAlignment_(2)
-        self.addSubview_(min_label)
+        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f}cm")
+        self.min_label.setBezeled_(False)
+        self.min_label.setDrawsBackground_(False)
+        self.min_label.setEditable_(False)
+        self.min_label.setSelectable_(False)
+        self.min_label.setTextColor_(NSColor.whiteColor())
+        self.min_label.setFont_(NSFont.systemFontOfSize_(12))
+        self.min_label.setAlignment_(2)
+        self.addSubview_(self.min_label)
 
-        max_label = NSTextField.alloc().initWithFrame_(
+        self.max_label = NSTextField.alloc().initWithFrame_(
             NSMakeRect(292, 90, 50, 16)
         )
-        max_label.setStringValue_("130cm")
-        max_label.setBezeled_(False)
-        max_label.setDrawsBackground_(False)
-        max_label.setEditable_(False)
-        max_label.setSelectable_(False)
-        max_label.setTextColor_(NSColor.whiteColor())
-        max_label.setFont_(NSFont.systemFontOfSize_(12))
-        max_label.setAlignment_(2)
-        self.addSubview_(max_label)
+        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f}cm")
+        self.max_label.setBezeled_(False)
+        self.max_label.setDrawsBackground_(False)
+        self.max_label.setEditable_(False)
+        self.max_label.setSelectable_(False)
+        self.max_label.setTextColor_(NSColor.whiteColor())
+        self.max_label.setFont_(NSFont.systemFontOfSize_(12))
+        self.max_label.setAlignment_(2)
+        self.addSubview_(self.max_label)
 
         # Version label
         version_label = NSTextField.alloc().initWithFrame_(
@@ -145,15 +145,16 @@ class SliderView(NSView):
 
     @staticmethod
     @objc.python_method
-    def updateUI(status_item, slider, height_value, move_slider_handle, ):
+    def updateUI(status_item, slider, height_value, move_slider_handle, update_text=True):
         """Function to update all dynamic UI elements."""
         # height display update
-        attr_title = NSAttributedString.alloc().initWithString_attributes_(
-            f"{height_value:>4}cm", {NSFontAttributeName: constants.MONO_FONT}
-        )
-        status_item.button().setAttributedTitle_(attr_title)
+        if update_text:
+            attr_title = NSAttributedString.alloc().initWithString_attributes_(
+                f"{height_value:>4}cm", {NSFontAttributeName: constants.MONO_FONT}
+            )
+            status_item.button().setAttributedTitle_(attr_title)
 
-        # icon frame update
+        # icon sprite update
         normalized = (height_value - constants.MIN_HEIGHT) / (constants.MAX_HEIGHT - constants.MIN_HEIGHT)
         frame_index = max(0, min(14, round(normalized * 14)))
         status_item.button().setImage_(constants.ICON_FRAMES[frame_index])
@@ -162,62 +163,19 @@ class SliderView(NSView):
         if move_slider_handle:
             slider.setDoubleValue_(height_value)
 
-    @objc.python_method
-    def startTransition_(self, target_value, move_slider_handle=False):
-        """
-        Coordinates the multi-step desk movement process:
-        1. Disables UI to prevent command overlapping.
-        2. Dispatches physical move command to a background thread.
-        3. Waits for hardware/comms delay.
-        4. Animates the height indicators (slider, icon, height display).
-        5. Re-enables UI once the physical move is confirmed finished.
-        """
-
-        def transition_task():
-            # Disable interaction on the main thread
-            self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", False, True)
-
-            cmd = constants.MOVE_CMD + str(target_value * 10)
-            desk_thread = threading.Thread(
-                target=Controller.execute_command,
-                args=(cmd,),
-                kwargs={"on_failure": self.app.server.reportCommandFailure},
-                daemon=True,
-            )
-            desk_thread.start()
-
-            time.sleep(1.5)
-
-            # Visual animation loop
-            start_val = self.current_height
-            step = 1.0 if target_value > start_val else -1.0
-            temp_val = start_val
-
-            while round(temp_val) != target_value:
-                temp_val += step
-                update_data = {"val": temp_val, "move_slider": move_slider_handle}
-                # Safely update UI from background thread
-                self.performSelectorOnMainThread_withObject_waitUntilDone_("syncTransitionUI:", update_data, False)
-                time.sleep(0.25)  # Speed of visual height updates
-
-            desk_thread.join()
-
-            self.current_height = target_value
-            self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", True, False)
-
-        threading.Thread(target=transition_task, daemon=True).start()
-
-    def syncTransitionUI_(self, data):
-        """Objective-C selector to update UI elements on the Main Thread."""
-        val = round(data["val"])
-        self.app.current_height = val
-        SliderView.updateUI(self.app.status_item, self.slider, val, data["move_slider"])
-
     def setUIState_(self, enabled):
         """Enables or disables UI elements to prevent user input during transitions."""
         self.slider.setEnabled_(enabled)
         self.sit_button.setEnabled_(enabled)
         self.stand_button.setEnabled_(enabled)
+
+    @objc.python_method
+    def updateLimits(self):
+        """Applies the current desk-derived height limits to slider and labels."""
+        self.slider.setMinValue_(constants.MIN_HEIGHT)
+        self.slider.setMaxValue_(constants.MAX_HEIGHT)
+        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f}cm")
+        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f}cm")
 
     def sliderChanged_(self, sender):
         """Action for slider movements (empty, action is triggered upon release)."""
@@ -226,19 +184,20 @@ class SliderView(NSView):
     def sliderReleased_(self, sender):
         """Triggered when user releases the slider thumb via CustomSliderCell."""
         target = round(self.slider.doubleValue())
-        self.startTransition_(target, move_slider_handle=False)
+        # The user placed the handle at the target already; don't drag it along.
+        self.app.beginMove(target, False)
 
     def shortcutSit_(self, sender):
         """Action for Sit button."""
         LOGGER.debug("Sit shortcut button pressed")
-        self.startTransition_(constants.CONFIG_SIT, move_slider_handle=True)
+        self.app.beginMove(constants.CONFIG_SIT, True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
         LOGGER.debug("Stand shortcut button pressed")
-        self.startTransition_(constants.CONFIG_STAND, move_slider_handle=True)
+        self.app.beginMove(constants.CONFIG_STAND, True)
 
     def quitApp_(self, sender):
-        """Shuts down the controller server and exits the application."""
+        """Shuts down the desk connection and exits the application."""
         LOGGER.debug("Quit button pressed")
         self.app.quit()

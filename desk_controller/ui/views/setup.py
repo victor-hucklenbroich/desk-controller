@@ -115,7 +115,7 @@ class InitialSetupView(NSView):
         LOGGER.info(f"user provided UUID: {uuid}")
         LOGGER.debug("Trying initial setup connection")
         config.ConfigParser.update(uuid)
-        self.app.server.retry()
+        self.app.desk.retry()
         self.app.checkAndUpdatePopover()
 
     def quitApp_(self, sender):

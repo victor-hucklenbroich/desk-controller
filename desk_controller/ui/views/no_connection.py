@@ -126,7 +126,7 @@ class NoConnectionView(NSView):
         if uuid != constants.CONFIG_UUID:
             LOGGER.info(f"user updated UUID: {uuid}")
             config.ConfigParser.update(uuid)
-        self.app.server.retry()
+        self.app.desk.retry()
         self.app.checkAndUpdatePopover()
 
     def quitApp_(self, sender):
