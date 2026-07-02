@@ -49,8 +49,7 @@ class SliderView(NSView):
         self.layer().setCornerRadius_(12)
         self.buildUI()
 
-        # A move may still be running while the popover is (re)opened.
-        if app.move_in_progress:
+        if app.move_in_progress or app.external_move_active:
             self.setUIState_(False)
 
         return self

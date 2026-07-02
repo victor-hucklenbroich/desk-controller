@@ -66,6 +66,7 @@ class MenuBarApp(NSObject):
             self.slider_view = None
             self.move_in_progress = False
             self.move_slider_handle = False
+            self.external_move_active = False
 
             self.desk = DeskService.alloc().init()
             self.desk.setApp(self)
@@ -179,6 +180,13 @@ class MenuBarApp(NSObject):
         """Height report from the desk service: fires while the app moves the
         desk AND when it is moved externally (physical buttons). Main thread."""
         self.current_height = height_cm
+
+        # Disable the controls while the desk is moved externally
+        if not self.move_in_progress and moving != self.external_move_active:
+            self.external_move_active = moving
+            if self.slider_view is not None:
+                self.slider_view.setUIState_(not moving)
+
         if self.current_content != ContentViews.SLIDER:
             # Status item is showing setup/spinner/warning
             return
@@ -194,7 +202,7 @@ class MenuBarApp(NSObject):
     def beginMove(self, target_cm, move_slider_handle):
         """Kicks off a desk move; the UI is re-enabled once the desk reports
         the move has finished."""
-        if self.move_in_progress:
+        if self.move_in_progress or self.external_move_active:
             return
         self.move_in_progress = True
         self.move_slider_handle = move_slider_handle
