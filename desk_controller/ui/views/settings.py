@@ -166,9 +166,9 @@ class SettingsView(NSView):
 
         self.app.closeSettings()
 
-        # A new UUID requires reconnecting the server to the new desk.
+        # A new UUID requires reconnecting to the new desk.
         if uuid_changed:
-            self.app.server.retry()
+            self.app.desk.retry()
         self.app.checkAndUpdatePopover()
 
     def cancel_(self, sender):

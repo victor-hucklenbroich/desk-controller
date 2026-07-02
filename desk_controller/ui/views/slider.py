@@ -1,6 +1,3 @@
-import threading
-import time
-
 import Cocoa
 import objc
 from AppKit import (
@@ -14,7 +11,6 @@ from Foundation import NSObject, NSMakeRect
 
 import constants
 from constants import LOGGER
-from control.process import Controller
 from ui import window
 
 
@@ -36,7 +32,9 @@ class SliderCell(NSSliderCell):
 class SliderView(NSView):
     """
     The main UI view for the desk controller popover.
-    Handles the UI layout, button interactions, and the asynchronous movement transitions.
+    Handles the UI layout and button interactions. Height changes (from app
+    commands or external movements) arrive through the app's height events,
+    so all indicators reflect what the desk actually reports.
     """
 
     def initWithApp_(self, app):
@@ -45,12 +43,15 @@ class SliderView(NSView):
             return None
 
         self.app = app
-        self.current_height = 75  # current desk state for animation logic
         frame = NSMakeRect(0, 0, 364, 120)
         self = self.initWithFrame_(frame)
         self.setWantsLayer_(True)
         self.layer().setCornerRadius_(12)
         self.buildUI()
+
+        # A move may still be running while the popover is (re)opened.
+        if app.move_in_progress:
+            self.setUIState_(False)
 
         return self
 
@@ -63,7 +64,7 @@ class SliderView(NSView):
         self.slider.setCell_(custom_cell)
         self.slider.setMinValue_(constants.MIN_HEIGHT)
         self.slider.setMaxValue_(constants.MAX_HEIGHT)
-        self.slider.setDoubleValue_(75)
+        self.slider.setDoubleValue_(self.app.current_height)
         self.slider.setTarget_(self)
         self.slider.setAction_("sliderChanged:")
         self.addSubview_(self.slider)
@@ -145,15 +146,16 @@ class SliderView(NSView):
 
     @staticmethod
     @objc.python_method
-    def updateUI(status_item, slider, height_value, move_slider_handle, ):
+    def updateUI(status_item, slider, height_value, move_slider_handle, update_text=True):
         """Function to update all dynamic UI elements."""
         # height display update
-        attr_title = NSAttributedString.alloc().initWithString_attributes_(
-            f"{height_value:>4}cm", {NSFontAttributeName: constants.MONO_FONT}
-        )
-        status_item.button().setAttributedTitle_(attr_title)
+        if update_text:
+            attr_title = NSAttributedString.alloc().initWithString_attributes_(
+                f"{height_value:>4}cm", {NSFontAttributeName: constants.MONO_FONT}
+            )
+            status_item.button().setAttributedTitle_(attr_title)
 
-        # icon frame update
+        # icon sprite update
         normalized = (height_value - constants.MIN_HEIGHT) / (constants.MAX_HEIGHT - constants.MIN_HEIGHT)
         frame_index = max(0, min(14, round(normalized * 14)))
         status_item.button().setImage_(constants.ICON_FRAMES[frame_index])
@@ -161,57 +163,6 @@ class SliderView(NSView):
         # slider update
         if move_slider_handle:
             slider.setDoubleValue_(height_value)
-
-    @objc.python_method
-    def startTransition_(self, target_value, move_slider_handle=False):
-        """
-        Coordinates the multi-step desk movement process:
-        1. Disables UI to prevent command overlapping.
-        2. Dispatches physical move command to a background thread.
-        3. Waits for hardware/comms delay.
-        4. Animates the height indicators (slider, icon, height display).
-        5. Re-enables UI once the physical move is confirmed finished.
-        """
-
-        def transition_task():
-            # Disable interaction on the main thread
-            self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", False, True)
-
-            cmd = constants.MOVE_CMD + str(target_value * 10)
-            desk_thread = threading.Thread(
-                target=Controller.execute_command,
-                args=(cmd,),
-                kwargs={"on_failure": self.app.server.reportCommandFailure},
-                daemon=True,
-            )
-            desk_thread.start()
-
-            time.sleep(1.5)
-
-            # Visual animation loop
-            start_val = self.current_height
-            step = 1.0 if target_value > start_val else -1.0
-            temp_val = start_val
-
-            while round(temp_val) != target_value:
-                temp_val += step
-                update_data = {"val": temp_val, "move_slider": move_slider_handle}
-                # Safely update UI from background thread
-                self.performSelectorOnMainThread_withObject_waitUntilDone_("syncTransitionUI:", update_data, False)
-                time.sleep(0.25)  # Speed of visual height updates
-
-            desk_thread.join()
-
-            self.current_height = target_value
-            self.performSelectorOnMainThread_withObject_waitUntilDone_("setUIState:", True, False)
-
-        threading.Thread(target=transition_task, daemon=True).start()
-
-    def syncTransitionUI_(self, data):
-        """Objective-C selector to update UI elements on the Main Thread."""
-        val = round(data["val"])
-        self.app.current_height = val
-        SliderView.updateUI(self.app.status_item, self.slider, val, data["move_slider"])
 
     def setUIState_(self, enabled):
         """Enables or disables UI elements to prevent user input during transitions."""
@@ -226,19 +177,20 @@ class SliderView(NSView):
     def sliderReleased_(self, sender):
         """Triggered when user releases the slider thumb via CustomSliderCell."""
         target = round(self.slider.doubleValue())
-        self.startTransition_(target, move_slider_handle=False)
+        # The user placed the handle at the target already; don't drag it along.
+        self.app.beginMove(target, False)
 
     def shortcutSit_(self, sender):
         """Action for Sit button."""
         LOGGER.debug("Sit shortcut button pressed")
-        self.startTransition_(constants.CONFIG_SIT, move_slider_handle=True)
+        self.app.beginMove(constants.CONFIG_SIT, True)
 
     def shortcutStand_(self, sender):
         """Action for Stand button."""
         LOGGER.debug("Stand shortcut button pressed")
-        self.startTransition_(constants.CONFIG_STAND, move_slider_handle=True)
+        self.app.beginMove(constants.CONFIG_STAND, True)
 
     def quitApp_(self, sender):
-        """Shuts down the controller server and exits the application."""
+        """Shuts down the desk connection and exits the application."""
         LOGGER.debug("Quit button pressed")
         self.app.quit()

@@ -1,5 +1,3 @@
-import time
-
 import yaml
 
 import constants
@@ -12,7 +10,7 @@ class ConfigParser:
         with (open(constants.CONFIG_FILE_PATH) as stream):
             try:
                 CONFIG = yaml.safe_load(stream)
-                return CONFIG
+                return CONFIG or {}
             except yaml.YAMLError as e:
                 LOGGER.warning(f"Error parsing config.yaml: {e}")
                 return {}
@@ -28,9 +26,9 @@ class ConfigParser:
 
         config = ConfigParser.parse()
         config["mac_address"] = str(constants.CONFIG_UUID)
+        config.setdefault("favourites", {})
         config["favourites"]["sit"] = int(constants.CONFIG_SIT) * 10
         config["favourites"]["stand"] = int(constants.CONFIG_STAND) * 10
         with open(constants.CONFIG_FILE_PATH, 'w') as out:
             yaml.safe_dump(config, out, default_flow_style=False)
-        time.sleep(0.2)
         LOGGER.info("Updated config.yaml with updated preferences")
