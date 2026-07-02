@@ -47,9 +47,11 @@ LINAK_PATH = _find_linak_controller()
 
 
 # --- Static Constants ---
-VERSION: str = "v1.1.0"
+VERSION: str = "v1.1.1"
 MIN_HEIGHT: int = 63
 MAX_HEIGHT: int = 127
+LINAK_PATH = shutil.which("linak-controller") or "/opt/homebrew/anaconda3/bin/linak-controller"
+MOVE_CMD: str = LINAK_PATH + " --forward --move-to "
 FAILURE_MARKERS: tuple = ("Traceback", "Something unexpected went wrong")
 
 # --- Preference constants ---
