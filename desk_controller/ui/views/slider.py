@@ -109,15 +109,14 @@ class SliderView(NSView):
         version_label.setAlignment_(0)
         self.addSubview_(version_label)
 
-        # Shortcut buttons for preset heights
-        self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(22, 38, 163, 25))
+        self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(22, 38, 152, 25))
         self.sit_button.setTitle_("Sit")
         self.sit_button.setBezelStyle_(2)
         self.sit_button.setTarget_(self)
         self.sit_button.setAction_("shortcutSit:")
         self.addSubview_(self.sit_button)
 
-        self.stand_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(182, 38, 158, 25))
+        self.stand_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(190, 38, 152, 25))
         self.stand_button.setTitle_("Stand")
         self.stand_button.setBezelStyle_(2)
         self.stand_button.setTarget_(self)
