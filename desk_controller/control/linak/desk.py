@@ -29,6 +29,8 @@ class Desk:
         self._watching: bool = False
         self.latest_height: Optional[Height] = None
         self.latest_speed: Optional[Speed] = None
+        # True when base_height is a hardcoded fallback the desk never confirmed
+        self.base_height_estimated: bool = False
 
     @classmethod
     async def initialise(cls, config: dict, client: BleakClient) -> "Desk":
@@ -60,6 +62,7 @@ class Desk:
                 # Desk did not answer: assume a typical frame rather than crash
                 logger.log("Could not read base height from desk; assuming 620mm")
                 desk.config["base_height"] = 620
+                desk.base_height_estimated = True
         else:
             desk.config["base_height"] = config["base_height"]
         logger.log("Base height:{:4.0f}mm".format(desk.config["base_height"]))

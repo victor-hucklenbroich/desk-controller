@@ -1,4 +1,5 @@
-# Pushing a tag like v1.2.3 builds, signs, and notarizes DeskController.app,
+# Pushing a tag like v1.2.3 builds, signs, and notarizes a universal2
+# (Apple Silicon + Intel) DeskController.app,
 # publishes the zip as a GitHub Release, and bumps the cask in the
 # victor-hucklenbroich/homebrew-tap repo.
 #
@@ -34,10 +35,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install build dependencies
-        run: pip install pyinstaller -r requirements.txt
+        env:
+          PYYAML_FORCE_LIBYAML: "0"
+        run: pip install --no-binary PyYAML pyinstaller -r requirements.txt
 
       - name: Import Developer ID certificate into a temporary keychain
         env:

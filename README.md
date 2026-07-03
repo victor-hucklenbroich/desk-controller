@@ -1,6 +1,6 @@
 # DeskController Menu Bar App
 
-**Version:** v1.2.0
+**v1.3.0**
 
 DeskController is a lightweight macOS menu bar application for controlling Linak-based standing desks. DeskController talks to the desk directly over Bluetooth (BLE) and keeps a persistent connection in the background.
 
@@ -19,7 +19,9 @@ DeskController is distributed as a signed, notarized, fully self-contained app b
 
 ### Compatibility
 
-The App is only tested on Apple Silicon Macs with macOS Tahoe. DeskController's Bluetooth communication layer is based on [linak-controller](https://github.com/rhyst/linak-controller), an open-source project for controlling Linak standing desk controllers via Bluetooth.
+DeskController ships as a universal binary and runs natively on both Apple Silicon and Intel Macs. It is primarily tested on Apple Silicon Macs with macOS Tahoe and an Ikea Idasen. 
+
+DeskController's Bluetooth communication layer is based on [linak-controller](https://github.com/rhyst/linak-controller), an open-source project for controlling Linak standing desk controllers via Bluetooth.
 
  Compatible Desks reported by linak-controller:
 - Ikea Idasen
@@ -62,6 +64,13 @@ git clone https://github.com/victor-hucklenbroich/desk-controller.git
 cd desk-controller
 pip install pyinstaller -r requirements.txt
 pyinstaller app.spec
+```
+
+This builds an app for your machine's architecture. Release builds are universal2, reproducing one requires a universal2 Python (e.g. from python.org) and a pure-Python PyYAML:
+
+```bash
+PYYAML_FORCE_LIBYAML=0 pip install --no-binary PyYAML pyinstaller -r requirements.txt
+DC_TARGET_ARCH=universal2 pyinstaller app.spec
 ```
 
 

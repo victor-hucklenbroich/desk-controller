@@ -24,8 +24,22 @@ else
 fi
 
 echo "==> Building $APP_NAME (version $VERSION)"
-pyinstaller --noconfirm "$SPEC_FILE"
+DC_TARGET_ARCH=universal2 pyinstaller --noconfirm "$SPEC_FILE"
 [ -d "$DIST_PATH" ] || { echo "Build did not produce $DIST_PATH"; exit 1; }
+
+echo "==> Verifying the bundle is universal (x86_64 + arm64)"
+thin_binaries=""
+while IFS= read -r -d '' bin; do
+  archs="$(lipo -archs "$bin" 2>/dev/null)" || continue  # not a Mach-O file
+  case "$archs" in
+    *x86_64*arm64*|*arm64*x86_64*) ;;
+    *) thin_binaries="${thin_binaries}${bin} (${archs})"$'\n' ;;
+  esac
+done < <(find "$DIST_PATH" -type f \( -perm +111 -o -name '*.so' -o -name '*.dylib' \) -print0)
+if [ -n "$thin_binaries" ]; then
+  printf 'Binaries missing an architecture slice:\n%s' "$thin_binaries" >&2
+  exit 1
+fi
 
 echo "==> Code signing"
 codesign --force --deep --options runtime --timestamp \

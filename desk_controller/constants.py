@@ -35,7 +35,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 # --- Static Constants ---
-VERSION: str = "v1.2.0"
+VERSION: str = "v1.3.0"
 PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
 
 # --- Desk height limits (cm, floats for mm precision) ---
@@ -48,6 +48,8 @@ MAX_HEIGHT: float = 127.0
 MAX_RECONNECT_FAILURES: int = 3
 RECONNECT_DELAY: float = 2.0
 WAKE_RECONNECT_DELAY: float = 2.0
+HANDSHAKE_TIMEOUT: float = 15.0 # seconds
+AUTO_RETRY_DELAY: float = 360.0 # seconds
 
 
 # --- Preference constants ---

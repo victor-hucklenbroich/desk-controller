@@ -150,7 +150,7 @@ class SliderView(NSView):
         # height display update
         if update_text:
             attr_title = NSAttributedString.alloc().initWithString_attributes_(
-                f"{height_value:>4}cm", {NSFontAttributeName: constants.MONO_FONT}
+                f"{height_value:>4}cm ", {NSFontAttributeName: constants.MONO_FONT}
             )
             status_item.button().setAttributedTitle_(attr_title)
 
