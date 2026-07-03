@@ -49,6 +49,7 @@ MAX_RECONNECT_FAILURES: int = 3
 RECONNECT_DELAY: float = 2.0
 WAKE_RECONNECT_DELAY: float = 2.0
 HANDSHAKE_TIMEOUT: float = 15.0 # seconds
+AUTO_RETRY_DELAY: float = 360.0 # seconds
 
 
 # --- Preference constants ---

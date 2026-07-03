@@ -50,6 +50,7 @@ class DeskService(NSObject):
         self._was_moving = False
         self._max_seen_mm = 0.0
         self._observing_workspace = False
+        self._retry_handle = None  # pending background auto-retry (loop thread)
         return self
 
     # --- Public API (main thread) ---
@@ -87,6 +88,7 @@ class DeskService(NSObject):
                 future.result(timeout=3.0)
             except Exception as e:
                 LOGGER.warning(f"Error disconnecting from desk: {e}")
+            self._loop.call_soon_threadsafe(self._cancel_auto_retry)
             self._loop.call_soon_threadsafe(self._loop.stop)
             self._thread.join(timeout=2.0)
         self._state = DeskState.IDLE
@@ -164,6 +166,7 @@ class DeskService(NSObject):
 
     @objc.python_method
     async def _recycle_and_connect(self, initial_delay=0.0):
+        self._cancel_auto_retry()
         await self._disconnect_current()
         await self._connect(initial_delay)
 
@@ -172,6 +175,7 @@ class DeskService(NSObject):
         if self._connecting:
             return  # a connect loop is already running; it reads the config fresh
         self._connecting = True
+        self._cancel_auto_retry()  # a fresh attempt supersedes any scheduled one
         try:
             if initial_delay:
                 await asyncio.sleep(initial_delay)
@@ -211,8 +215,12 @@ class DeskService(NSObject):
                     await self._safe_disconnect(client)
                     failures += 1
                     if failures >= constants.MAX_RECONNECT_FAILURES:
-                        LOGGER.error("Desk unreachable after retries; marking dead")
+                        LOGGER.error(
+                            "Desk unreachable after retries; will keep retrying "
+                            f"every {constants.AUTO_RETRY_DELAY:.0f}s"
+                        )
                         self._request_state(DeskState.DEAD)
+                        self._schedule_auto_retry()
                         return
                     await asyncio.sleep(constants.RECONNECT_DELAY)
         finally:
@@ -232,6 +240,7 @@ class DeskService(NSObject):
         )
         desk.subscribe(self._on_height_speed)
         await desk.start_watching()
+        # Initial height so slider/display don't sit on a default
         height = desk.latest_height
         speed = desk.latest_speed
         if height is None:
@@ -280,6 +289,36 @@ class DeskService(NSObject):
         asyncio.run_coroutine_threadsafe(
             self._connect(constants.RECONNECT_DELAY), self._loop
         )
+
+    # --- Background auto-retry (BLE loop thread) ---
+
+    @objc.python_method
+    def _schedule_auto_retry(self):
+        """Queue a background reconnect after AUTO_RETRY_DELAY so a desk that is
+        off/unreachable recovers on its own without the user intervening."""
+        self._cancel_auto_retry()
+        if self._closing or self._suspended or self._loop is None:
+            return
+        self._retry_handle = self._loop.call_later(
+            constants.AUTO_RETRY_DELAY, self._auto_retry_fire
+        )
+
+    @objc.python_method
+    def _cancel_auto_retry(self):
+        """Cancel any pending background reconnect."""
+        if self._retry_handle is not None:
+            self._retry_handle.cancel()
+            self._retry_handle = None
+
+    @objc.python_method
+    def _auto_retry_fire(self):
+        """Start a fresh reconnect burst if still not connected."""
+        self._retry_handle = None
+        if self._closing or self._suspended:
+            return
+        LOGGER.info("Auto-retrying desk connection")
+        self._request_state(DeskState.CONNECTING)
+        self._loop.create_task(self._connect())
 
     # --- Moving (BLE loop thread) ---
 
