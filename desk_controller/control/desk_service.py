@@ -187,27 +187,19 @@ class DeskService(NSObject):
                 try:
                     LOGGER.info(f"Desk connection attempt to {uuid}")
                     await client.connect(timeout=constants.CONNECTION_TIMEOUT)
-                    desk = await Desk.initialise(
-                        {
-                            "base_height": constants.CONFIG_BASE_HEIGHT,
-                            "move_command_period": constants.MOVE_COMMAND_PERIOD,
-                        },
-                        client,
+                    desk, height, speed = await asyncio.wait_for(
+                        self._perform_handshake(client),
+                        timeout=constants.HANDSHAKE_TIMEOUT,
                     )
-                    desk.subscribe(self._on_height_speed)
-                    await desk.start_watching()
                     self._client = client
                     self._desk = desk
                     self._max_seen_mm = 0.0
-
-                    # Initial height so slider/display don't sit on a default
-                    height = desk.latest_height
-                    speed = desk.latest_speed
-                    if height is None:
-                        height, speed = await desk.get_height_speed()
                     LOGGER.info(f"Connected to desk at {height.human}mm")
 
-                    base_mm = float(desk.config["base_height"])
+                    base_mm = (
+                        None if desk.base_height_estimated
+                        else float(desk.config["base_height"])
+                    )
                     max_mm = max(constants.MAX_HEIGHT * 10.0, float(height.human))
                     AppHelper.callAfter(self._applyLimits, base_mm, max_mm)
 
@@ -216,10 +208,7 @@ class DeskService(NSObject):
                     return
                 except Exception as e:
                     LOGGER.warning(f"Desk connection attempt failed: {e}")
-                    try:
-                        await client.disconnect()
-                    except Exception:
-                        pass
+                    await self._safe_disconnect(client)
                     failures += 1
                     if failures >= constants.MAX_RECONNECT_FAILURES:
                         LOGGER.error("Desk unreachable after retries; marking dead")
@@ -228,6 +217,36 @@ class DeskService(NSObject):
                     await asyncio.sleep(constants.RECONNECT_DELAY)
         finally:
             self._connecting = False
+
+    @objc.python_method
+    async def _perform_handshake(self, client):
+        """Initialise the desk over a freshly-connected client and start the
+        height/speed watch. Kept as one coroutine so the caller can bound the
+        whole GATT exchange with a single timeout."""
+        desk = await Desk.initialise(
+            {
+                "base_height": constants.CONFIG_BASE_HEIGHT,
+                "move_command_period": constants.MOVE_COMMAND_PERIOD,
+            },
+            client,
+        )
+        desk.subscribe(self._on_height_speed)
+        await desk.start_watching()
+        height = desk.latest_height
+        speed = desk.latest_speed
+        if height is None:
+            height, speed = await desk.get_height_speed()
+        return desk, height, speed
+
+    @objc.python_method
+    async def _safe_disconnect(self, client):
+        """Best-effort disconnect of a failed attempt that can't hang the loop."""
+        try:
+            await asyncio.wait_for(
+                client.disconnect(), timeout=constants.CONNECTION_TIMEOUT
+            )
+        except Exception:
+            pass
 
     @objc.python_method
     async def _disconnect_current(self):

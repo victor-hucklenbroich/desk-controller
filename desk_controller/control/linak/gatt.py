@@ -1,7 +1,11 @@
+import asyncio
 import struct
 from bleak import BleakClient
 from typing import Optional, Tuple, Union
 from .util import Height, Speed, make_iter
+
+
+DPG_NOTIFY_TIMEOUT = 8.0
 
 
 class Characteristic:
@@ -174,14 +178,24 @@ class DPGService(Service):
     ) -> bytearray:
         iter, callback = make_iter()
         await cls.DPG.subscribe(client, callback)
-        if data:
-            await cls.DPG.write_command(client, command, data)
-        else:
-            await cls.DPG.read_command(client, command)
-        async for sender, data in iter:
-            # Return the first response from the callback
-            await cls.DPG.unsubscribe(client)
-            if data[0] == 1:
-                return data[2:]
+        try:
+            if data:
+                await cls.DPG.write_command(client, command, data)
             else:
-                return None
+                await cls.DPG.read_command(client, command)
+
+            async def _first_response():
+                async for _sender, response in iter:
+                    return response
+
+            response = await asyncio.wait_for(
+                _first_response(), timeout=DPG_NOTIFY_TIMEOUT
+            )
+        finally:
+            try:
+                await cls.DPG.unsubscribe(client)
+            except Exception:
+                pass
+        if response and response[0] == 1:
+            return response[2:]
+        return None

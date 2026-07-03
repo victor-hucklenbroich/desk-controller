@@ -48,6 +48,7 @@ MAX_HEIGHT: float = 127.0
 MAX_RECONNECT_FAILURES: int = 3
 RECONNECT_DELAY: float = 2.0
 WAKE_RECONNECT_DELAY: float = 2.0
+HANDSHAKE_TIMEOUT: float = 15.0 # seconds
 
 
 # --- Preference constants ---
