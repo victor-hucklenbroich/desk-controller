@@ -237,7 +237,7 @@ class MenuBarApp(NSObject):
         """Updates the menu bar icon/title to reflect the connection state."""
         button = self.status_item.button()
         button.setImage_(self._deskFrame())
-        button.setImagePosition_(2)
+        button.setImagePosition_(3)
 
         if state == ContentViews.CONNECTING:
             self._startStatusSpinner()
@@ -247,7 +247,7 @@ class MenuBarApp(NSObject):
         if state == ContentViews.NOCON:
             button.setAttributedTitle_(
                 NSAttributedString.alloc().initWithString_attributes_(
-                    " ⚠︎", {NSFontAttributeName: constants.MONO_FONT}
+                    "⚠︎ ", {NSFontAttributeName: constants.MONO_FONT}
                 )
             )
         elif state == ContentViews.SETUP:
@@ -278,7 +278,7 @@ class MenuBarApp(NSObject):
         self._spinner_index += 1
         button.setAttributedTitle_(
             NSAttributedString.alloc().initWithString_attributes_(
-                " " + glyph, {NSFontAttributeName: constants.MONO_FONT}
+                glyph + " ", {NSFontAttributeName: constants.MONO_FONT}
             )
         )
 
