@@ -41,6 +41,9 @@ if [ -n "$thin_binaries" ]; then
   exit 1
 fi
 
+echo "==> Pinning the executable's linked SDK for a deterministic appearance"
+"$REPO_ROOT/release/pin_sdk.sh" "$DIST_PATH/Contents/MacOS/DeskController"
+
 echo "==> Code signing"
 codesign --force --deep --options runtime --timestamp \
   --entitlements "$ENTITLEMENTS" \

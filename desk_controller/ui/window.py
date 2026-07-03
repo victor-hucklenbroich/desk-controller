@@ -21,6 +21,10 @@ def make_settings_button(target, frame):
     else:
         button.setTitle_("⚙")
     button.setBezelStyle_(8)
+
+    button.setBordered_(False)
+    button.setContentTintColor_(NSColor.secondaryLabelColor())
+    button.setFocusRingType_(1)  # NSFocusRingTypeNone
     button.setTarget_(target)
     button.setAction_("openSettings:")
     return button
