@@ -48,11 +48,11 @@ DeskController's Bluetooth communication layer is based on [linak-controller](ht
 
 3. **Enter your desks UUID**:
 
-![image](./docs/screenshots/welcome_view.png) ![image](./docs/screenshots/startup_view.png) 
+<img src="./docs/screenshots/welcome_view.png" alt="drawing" width="395"/> <img src="./docs/screenshots/startup_view.png" alt="drawing" width="395"/>
 
 4. **Control your desk!**
 
-![image](./docs/screenshots/desk_controller_view.png) 
+<img src="./docs/screenshots/desk_controller_view.png" alt="drawing" width="395"/>
 
 ### Build from source
 
@@ -76,7 +76,7 @@ DC_TARGET_ARCH=universal2 pyinstaller app.spec
 ## Troubleshooting
 If something goes wrong during installation, check the output of `brew install` to find the issue. A likely culprit is a missing or outdated Homebrew installation.
 
-![image](./docs/screenshots/connection_error_message.png)
+<img src="./docs/screenshots/connection_error_message.png" alt="drawing" width="395"/>
 
 If the DeskController App is not launching properly there is a prelaunch error log available at `~/Library/Logs/DeskController_error.log`. Most common issues are a wrong desk UUID, a missing Bluetooth permission for DeskController (System Settings → Privacy & Security → Bluetooth), or the Bluetooth connection between your Mac and desk. The desk UUID and presets are stored in the config file at `~/Library/Application Support/DeskController/config.yaml`. Also make sure the UUID is correct, and you can connect to your desk via Bluetooth. If you are still facing issues, check the runtime logs located at `~/Library/Logs/DeskController.log`.
 
