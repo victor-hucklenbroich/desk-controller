@@ -6,6 +6,8 @@ from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
     NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
+    NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
+    NSWindowStyleMaskMiniaturizable,
     NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
     NSAttributedString, NSFontAttributeName
 )
@@ -15,11 +17,14 @@ from ui.views.connecting import EstablishingConnectionView
 from ui.views.setup import InitialSetupView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
-from ui.views.settings import SettingsView
+from ui.views.settings import SettingsView, SETTINGS_WIDTH, SETTINGS_HEIGHT
 from ui.timer import _TimerProxy
+from ui import window
 from control.desk_service import DeskService
 from constants import LOGGER
 import constants
+
+SETTINGS_FRAME_NAME = "DeskControllerSettingsWindow"
 
 
 class KeyableWindow(NSWindow):
@@ -47,6 +52,8 @@ class MenuBarApp(NSObject):
         if self is None:
             return None
         try:
+            window.install_main_menu(self)
+
             self.status_bar = NSStatusBar.systemStatusBar()
             self.status_item = self.status_bar.statusItemWithLength_(
                 NSVariableStatusItemLength
@@ -290,30 +297,36 @@ class MenuBarApp(NSObject):
         self._spinner_proxy = None
 
     def openSettings(self):
-        """Opens the standalone, centered settings window."""
+        """Opens the standalone settings window."""
         self.hidePopover()
         if self.settings_window is None:
-            rect = NSMakeRect(0, 0, 364, 300)
-            self.settings_window = KeyableWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            rect = NSMakeRect(0, 0, SETTINGS_WIDTH, SETTINGS_HEIGHT)
+            self.settings_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
                 rect,
-                NSWindowStyleMaskBorderless,
+                NSWindowStyleMaskTitled
+                | NSWindowStyleMaskClosable
+                | NSWindowStyleMaskMiniaturizable,
                 NSBackingStoreBuffered,
                 False
             )
-            self.settings_window.setOpaque_(False)
-            self.settings_window.setBackgroundColor_(NSColor.clearColor())
-            self.settings_window.setLevel_(3)
+            self.settings_window.setTitle_("DeskController Settings")
+            self.settings_window.setReleasedWhenClosed_(False)
+            if not self.settings_window.setFrameUsingName_(SETTINGS_FRAME_NAME):
+                self.settings_window.center()
+            self.settings_window.setFrameAutosaveName_(SETTINGS_FRAME_NAME)
 
-        # Rebuild the view so the fields reflect the current config.
         self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
-        self.settings_window.center()
         Cocoa.NSApp.activateIgnoringOtherApps_(True)
         self.settings_window.makeKeyAndOrderFront_(None)
 
     def closeSettings(self):
         """Hides the settings window."""
         if self.settings_window:
-            self.settings_window.orderOut_(None)
+            self.settings_window.close()
+
+    def quitApp_(self, sender):
+        """Menu-driven quit; mirrors the popover's Quit button."""
+        self.quit()
 
     def quit(self):
         if hasattr(self, "desk") and self.desk is not None:
