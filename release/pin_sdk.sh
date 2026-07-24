@@ -6,6 +6,9 @@ EXE="${1:?Usage: pin_sdk.sh <executable> [minos] [sdk]}"
 MINOS="${2:-11.0}"
 SDK="${3:-26.0}"
 
+lipo() { xcrun lipo "$@"; }
+vtool() { xcrun vtool "$@"; }
+
 [ -f "$EXE" ] || { echo "pin_sdk: not a file: $EXE" >&2; exit 1; }
 archs="$(lipo -archs "$EXE" 2>/dev/null)" || { echo "pin_sdk: not a Mach-O: $EXE" >&2; exit 1; }
 

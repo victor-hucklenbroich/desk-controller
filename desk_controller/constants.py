@@ -35,7 +35,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 # --- Static Constants ---
-VERSION: str = "v1.3.2"
+VERSION: str = "v1.3.3"
 PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
 
 # --- Desk height limits (cm, floats for mm precision) ---
