@@ -27,7 +27,7 @@ case "$BUILD_PLATFORM" in
   *)
     echo "The build interpreter is '$BUILD_PLATFORM', not universal2:" >&2
     echo "  $(command -v python3)" >&2
-    echo "Create the universal2 build venv first — see release/README.md." >&2
+    echo "Create the universal2 build venv first" >&2
     exit 1
     ;;
 esac
