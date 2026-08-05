@@ -15,28 +15,16 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  # Manual runs only refresh the screenshots
-  workflow_dispatch:
 
 jobs:
   release:
     runs-on: macos-26
     permissions:
       contents: write
-    env:
-      SCREENSHOTS_ONLY: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Render README screenshots
-        run: |
-          brew list python@3.14 >/dev/null 2>&1 || brew install python@3.14
-          "$(brew --prefix python@3.14)/bin/python3.14" -m venv .venv-shots
-          .venv-shots/bin/pip install --quiet pyobjc-framework-Cocoa PyYAML
-          .venv-shots/bin/python docs/generate_screenshots.py
-
       - name: Read app version and check it matches the tag
-        if: env.SCREENSHOTS_ONLY != 'true'
         run: |
           VERSION="$(python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('desk_controller/constants.py').read_text()).group(1))")"
           if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
@@ -46,18 +34,15 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v5
-        if: env.SCREENSHOTS_ONLY != 'true'
         with:
           python-version: "3.13"
 
       - name: Install build dependencies
-        if: env.SCREENSHOTS_ONLY != 'true'
         env:
           PYYAML_FORCE_LIBYAML: "0"
         run: pip install --no-binary PyYAML pyinstaller -r requirements.txt
 
       - name: Import Developer ID certificate into a temporary keychain
-        if: env.SCREENSHOTS_ONLY != 'true'
         env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -81,7 +66,6 @@ jobs:
           echo "SIGN_ID=$SIGN_ID" >> "$GITHUB_ENV"
 
       - name: Build, sign, notarize, staple, package
-        if: env.SCREENSHOTS_ONLY != 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -89,7 +73,6 @@ jobs:
         run: ./release/build_release.sh
 
       - name: Create GitHub release with the zip
-        if: env.SCREENSHOTS_ONLY != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -100,7 +83,6 @@ jobs:
             || gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
 
       - name: Check out homebrew-tap
-        if: env.SCREENSHOTS_ONLY != 'true'
         uses: actions/checkout@v4
         with:
           repository: victor-hucklenbroich/homebrew-tap
@@ -108,7 +90,6 @@ jobs:
           path: tap
 
       - name: Bump cask version and sha256
-        if: env.SCREENSHOTS_ONLY != 'true'
         run: |
           SHA="$(shasum -a 256 "dist/DeskController-${VERSION}.zip" | cut -d' ' -f1)"
           sed -i '' \
@@ -121,24 +102,3 @@ jobs:
           git add Casks/desk-controller.rb
           git commit -m "desk-controller ${VERSION}"
           git push
-
-      - name: Commit refreshed screenshots
-        run: |
-          BRANCH="${{ github.event.repository.default_branch }}"
-          STAGE="$(mktemp -d)"
-          cp docs/screenshots/*.png "$STAGE/"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --depth=1 origin "$BRANCH"
-          git checkout -f -B "$BRANCH" "origin/$BRANCH"
-
-          mkdir -p docs/screenshots
-          cp "$STAGE"/*.png docs/screenshots/
-          git add docs/screenshots
-          if git diff --cached --quiet; then
-            echo "Screenshots unchanged."
-            exit 0
-          fi
-          git commit -m "Refresh README screenshots"
-          git push origin "$BRANCH"
