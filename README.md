@@ -56,7 +56,7 @@ DeskController's Bluetooth communication layer is based on [linak-controller](ht
 
 ### Build from source
 
-Developers can build locally instead of using the cask:
+Developers can build locally instead of using the cask. The quickest path is a plain PyInstaller build for your machine's architecture:
 
 ```bash
 git clone https://github.com/victor-hucklenbroich/desk-controller.git
@@ -65,12 +65,24 @@ pip install pyinstaller -r requirements.txt
 pyinstaller app.spec
 ```
 
-This builds an app for your machine's architecture. Release builds are universal2, reproducing one requires a universal2 Python (e.g. from python.org) and a pure-Python PyYAML:
+For a local build that also matches a release's appearance, run `packaging/dev/build.sh`. It builds for your architecture, pins the linked SDK so the AppKit appearance is deterministic, and ad-hoc signs the bundle with the release entitlements, so it needs no Developer ID certificate:
 
 ```bash
-PYYAML_FORCE_LIBYAML=0 pip install --no-binary PyYAML pyinstaller -r requirements.txt
-DC_TARGET_ARCH=universal2 pyinstaller app.spec
+./packaging/dev/build.sh
 ```
+
+Release builds (`packaging/release/build.sh`) run the same core process, then add the distribution-only steps: they are universal2, and additionally Developer ID signed, notarized and stapled. Reproducing one requires a universal2 Python (e.g. from python.org) and a pure-Python PyYAML, in a venv of its own:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13 -m venv .venv-build
+source .venv-build/bin/activate
+pip install pyinstaller -r requirements.txt
+# PyYAML publishes single-arch wheels, rebuild it without the libyaml C extension
+PYYAML_FORCE_LIBYAML=0 pip install --no-binary PyYAML --force-reinstall --no-cache-dir --no-deps PyYAML
+./packaging/release/build.sh
+```
+
+Both scripts pick up `.venv-build` automatically. Do not build from a venv shared with other projects: anything that reinstalls PyYAML there drops a single-arch `_yaml*.so` back in, and PyInstaller then fails with `IncompatibleBinaryArchError: ... is not a fat binary!`. The `--force-reinstall` above is what makes the command fix such a venv instead of skipping PyYAML as already satisfied.
 
 
 ## Troubleshooting
