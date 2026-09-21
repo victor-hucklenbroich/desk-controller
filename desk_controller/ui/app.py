@@ -122,6 +122,7 @@ class MenuBarApp(NSObject):
         y = button_frame.origin.y - window_frame.size.height - 8
 
         self.popover_window.setFrameOrigin_((x, y))
+        Cocoa.NSApp.activateIgnoringOtherApps_(True)
         self.popover_window.makeKeyAndOrderFront_(None)
 
         self.is_visible = True

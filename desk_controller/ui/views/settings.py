@@ -1,6 +1,6 @@
 import Cocoa
 import objc
-from AppKit import NSView, NSColor, NSTextField
+from AppKit import NSView, NSColor, NSTextField, NSSlider
 from Foundation import NSObject, NSMakeRect
 
 import constants
@@ -42,15 +42,17 @@ class SettingsView(NSView):
 
         # Sit preset
         self.addSubview_(self._fieldLabel_("Sit preset height (cm)", 154))
-        self.sit_field = self._textField_(128)
-        self.sit_field.setStringValue_(str(constants.CONFIG_SIT))
-        self.addSubview_(self.sit_field)
+        self.sit_slider = self._presetSlider_(130, constants.CONFIG_SIT)
+        self.addSubview_(self.sit_slider)
+        self.sit_value = self._valueLabel_(132, constants.CONFIG_SIT)
+        self.addSubview_(self.sit_value)
 
         # Stand preset
         self.addSubview_(self._fieldLabel_("Stand preset height (cm)", 94))
-        self.stand_field = self._textField_(68)
-        self.stand_field.setStringValue_(str(constants.CONFIG_STAND))
-        self.addSubview_(self.stand_field)
+        self.stand_slider = self._presetSlider_(70, constants.CONFIG_STAND)
+        self.addSubview_(self.stand_slider)
+        self.stand_value = self._valueLabel_(72, constants.CONFIG_STAND)
+        self.addSubview_(self.stand_value)
 
         # Version label
         self.addSubview_(theme.label(
@@ -97,32 +99,49 @@ class SettingsView(NSView):
         field.setAlignment_(theme.ALIGN_LEFT)
         return field
 
+    @objc.python_method
+    def _presetSlider_(self, y, value):
+        """Builds a preset height slider spanning the desk's travel range,
+        mirroring the main popover control. Continuous so the value indicator
+        tracks the handle live while dragging."""
+        slider = NSSlider.alloc().initWithFrame_(NSMakeRect(20, y, 280, 20))
+        slider.setMinValue_(constants.MIN_HEIGHT)
+        slider.setMaxValue_(constants.MAX_HEIGHT)
+        slider.setDoubleValue_(value)
+        slider.setContinuous_(True)
+        slider.setTarget_(self)
+        slider.setAction_("sliderChanged:")
+        return slider
+
+    @objc.python_method
+    def _valueLabel_(self, y, value):
+        """Builds the numeric readout shown next to a preset slider."""
+        return theme.label(
+            self._formatHeight(value), NSMakeRect(312, y, 58, 16),
+            size=13, weight=theme.WEIGHT_SEMIBOLD, align=theme.ALIGN_RIGHT,
+        )
+
+    @objc.python_method
+    def _formatHeight(self, cm):
+        return f"{int(round(cm))} cm"
+
     def viewDidMoveToWindow(self):
         # The window is brought to the front by the app.
         if self.window() is not None:
             self.window().makeFirstResponder_(self.uuid_field)
 
-    @objc.python_method
-    def _parseHeight(self, raw, fallback):
-        """Parses a height (cm) entry, falling back to the current value if invalid."""
-        try:
-            value = int(round(float(raw.strip())))
-        except (ValueError, TypeError, AttributeError):
-            LOGGER.warning(f"Invalid height input '{raw}', keeping {fallback}cm")
-            return fallback
-        if value < constants.MIN_HEIGHT or value > constants.MAX_HEIGHT:
-            LOGGER.warning(
-                f"Height {value}cm out of range "
-                f"({constants.MIN_HEIGHT}-{constants.MAX_HEIGHT}), keeping {fallback}cm"
-            )
-            return fallback
-        return value
+    def sliderChanged_(self, sender):
+        """Live-updates the value indicator as a preset slider is dragged."""
+        if sender is self.sit_slider:
+            self.sit_value.setStringValue_(self._formatHeight(sender.doubleValue()))
+        elif sender is self.stand_slider:
+            self.stand_value.setStringValue_(self._formatHeight(sender.doubleValue()))
 
     def save_(self, sender):
         """Persists the entered preferences to config.yaml and runtime constants."""
         uuid = self.uuid_field.stringValue().strip()
-        sit = self._parseHeight(self.sit_field.stringValue(), constants.CONFIG_SIT)
-        stand = self._parseHeight(self.stand_field.stringValue(), constants.CONFIG_STAND)
+        sit = int(round(self.sit_slider.doubleValue()))
+        stand = int(round(self.stand_slider.doubleValue()))
 
         uuid_changed = uuid != "" and uuid != constants.CONFIG_UUID
         LOGGER.info(f"Saving settings (uuid_changed={uuid_changed}, sit={sit}, stand={stand})")
