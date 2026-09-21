@@ -108,7 +108,7 @@ class MenuBarApp(NSObject):
 
             self.popover_window.setOpaque_(False)
             self.popover_window.setBackgroundColor_(NSColor.clearColor())
-            self.popover_window.setHasShadow_(True)
+            self.popover_window.setHasShadow_(False)
             self.popover_window.setLevel_(3)
 
         self.checkAndUpdatePopover()

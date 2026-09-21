@@ -41,6 +41,7 @@ def make_container(width, height, radius):
     if _GLASS_CLASS is not None:
         glass = _GLASS_CLASS.alloc().initWithFrame_(frame)
         glass.setCornerRadius_(radius)
+        glass.setClipsToBounds_(True)
         return glass
 
     LOGGER.info("NSGlassEffectView unavailable; using frosted material fallback")
