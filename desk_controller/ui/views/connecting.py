@@ -1,18 +1,14 @@
-import Cocoa
 import objc
 from AppKit import (
-    NSApplication, NSStatusBar, NSVariableStatusItemLength,
-    NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
-    NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
-    NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
-    NSAttributedString, NSFontAttributeName, NSProgressIndicator,
-    NSProgressIndicatorStyleSpinning, NSControlSizeSmall
+    NSView, NSColor, NSProgressIndicator,
+    NSProgressIndicatorStyleSpinning, NSControlSizeSmall,
 )
 from Foundation import NSObject, NSMakeRect
 
 import constants
 from constants import LOGGER
 from ui import window
+from ui import theme
 
 
 class EstablishingConnectionView(NSView):
@@ -26,18 +22,19 @@ class EstablishingConnectionView(NSView):
             return None
 
         self.app = app
-        frame = NSMakeRect(0, 0, 364, 120)
+        frame = NSMakeRect(0, 0, theme.POPOVER_WIDTH, theme.POPOVER_HEIGHT)
         self = self.initWithFrame_(frame)
-        self.setWantsLayer_(True)
-        self.layer().setCornerRadius_(12)
         self.buildUI()
 
         return self
 
     def buildUI(self):
         """Initializes and positions all UI elements within the popover."""
+        pad = theme.PAD
+        width = theme.POPOVER_WIDTH
+
         spinner = NSProgressIndicator.alloc().initWithFrame_(
-            NSMakeRect(185, 30, 18, 18)
+            NSMakeRect((width - 20) / 2, 108, 20, 20)
         )
         spinner.setStyle_(NSProgressIndicatorStyleSpinning)
         spinner.setControlSize_(NSControlSizeSmall)
@@ -45,44 +42,19 @@ class EstablishingConnectionView(NSView):
         spinner.startAnimation_(None)
         self.addSubview_(spinner)
 
-        # Title label
-        error_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(95, 50, 210, 30)
-        )
-        error_label.setStringValue_("Connecting to your Desk...")
-        error_label.setBezeled_(False)
-        error_label.setDrawsBackground_(False)
-        error_label.setEditable_(False)
-        error_label.setSelectable_(False)
-        error_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.6))
-        error_label.setFont_(NSFont.systemFontOfSize_(15))
-        error_label.setAlignment_(0)
-        self.addSubview_(error_label)
+        self.addSubview_(theme.label(
+            "Connecting to your desk…", NSMakeRect(pad, 78, width - 2 * pad, 22),
+            size=15, color=NSColor.secondaryLabelColor(), align=theme.ALIGN_CENTER,
+        ))
 
-        # Version label
-        version_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 8, 90, 16)
-        )
-        version_label.setStringValue_(constants.VERSION)
-        version_label.setBezeled_(False)
-        version_label.setDrawsBackground_(False)
-        version_label.setEditable_(False)
-        version_label.setSelectable_(False)
-        version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
-        version_label.setFont_(NSFont.systemFontOfSize_(12))
-        version_label.setAlignment_(0)
-        self.addSubview_(version_label)
-
-        # App Quit button
-        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
-        quit_button.setTitle_("Quit")
-        quit_button.setBezelStyle_(8)
-        quit_button.setTarget_(self)
-        quit_button.setAction_("quitApp:")
-        self.addSubview_(quit_button)
-
-    def drawRect_(self, rect):
-        window.draw_rect(rect)
+        # Footer: version + quit
+        self.addSubview_(theme.label(
+            constants.VERSION, NSMakeRect(pad, 13, 120, 16),
+            size=11, color=NSColor.tertiaryLabelColor(),
+        ))
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, 11, 24, 24)
+        ))
 
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""
