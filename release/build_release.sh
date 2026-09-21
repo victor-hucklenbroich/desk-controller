@@ -32,6 +32,13 @@ case "$BUILD_PLATFORM" in
     ;;
 esac
 
+if python3 -c 'import sys, yaml; sys.exit(0 if yaml.__with_libyaml__ else 1)'; then
+  echo "PyYAML in $(command -v python3) was installed with the libyaml extension," >&2
+  echo "which is single-arch and breaks the universal2 build. Reinstall it as pure Python:" >&2
+  echo "  PYYAML_FORCE_LIBYAML=0 pip install --no-binary PyYAML --force-reinstall --no-cache-dir --no-deps PyYAML" >&2
+  exit 1
+fi
+
 VERSION="$(python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('$REPO_ROOT/desk_controller/constants.py').read_text()).group(1))")"
 ZIP_NAME="DeskController-${VERSION}.zip"
 ZIP_PATH="$REPO_ROOT/dist/$ZIP_NAME"
