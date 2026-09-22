@@ -13,7 +13,7 @@ from Foundation import NSMakeRect
 
 # Popover geometry
 POPOVER_WIDTH = 340
-POPOVER_HEIGHT = 188
+POPOVER_HEIGHT = 164
 POPOVER_RADIUS = 22.0
 PAD = 18
 

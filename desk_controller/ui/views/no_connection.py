@@ -31,22 +31,31 @@ class NoConnectionView(NSView):
         """Initializes and positions all UI elements within the popover."""
         pad = theme.PAD
         width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
         inner = width - 2 * pad
 
-        # Title + subtitle
+        # Controls: settings and quit
+        self.addSubview_(window.make_settings_button(
+            self, NSMakeRect(width - pad - 54, height - 38, 24, 24)
+        ))
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
+
+        # Header
         self.addSubview_(theme.label(
-            "Couldn't connect to your desk", NSMakeRect(pad, 150, inner, 22),
-            size=16, weight=theme.WEIGHT_SEMIBOLD, align=theme.ALIGN_CENTER,
+            "Couldn't connect to your desk", NSMakeRect(pad, 128, inner - 70, 22),
+            size=16, weight=theme.WEIGHT_SEMIBOLD,
         ))
         self.addSubview_(theme.label(
             "Check the address and that Bluetooth is on",
-            NSMakeRect(pad, 128, inner, 18),
-            size=12, color=NSColor.secondaryLabelColor(), align=theme.ALIGN_CENTER,
+            NSMakeRect(pad, 104, inner, 18),
+            size=12, color=NSColor.secondaryLabelColor(),
         ))
 
         # UUID field (prefilled with the current address)
         self.uuid_field = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(pad, 90, inner, 24)
+            NSMakeRect(pad, 64, inner, 24)
         )
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
@@ -61,7 +70,7 @@ class NoConnectionView(NSView):
 
         # Try again button (primary, default action)
         retry_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect((width - 120) / 2, 48, 120, 30)
+            NSMakeRect((width - 120) / 2, 18, 120, 30)
         )
         retry_button.setTitle_("Try Again")
         retry_button.setBezelStyle_(1)
@@ -69,18 +78,6 @@ class NoConnectionView(NSView):
         retry_button.setTarget_(self)
         retry_button.setAction_("retry:")
         self.addSubview_(retry_button)
-
-        # Footer: version + settings + quit
-        self.addSubview_(theme.label(
-            constants.VERSION, NSMakeRect(pad, 13, 120, 16),
-            size=11, color=NSColor.tertiaryLabelColor(),
-        ))
-        self.addSubview_(window.make_settings_button(
-            self, NSMakeRect(width - pad - 54, 11, 24, 24)
-        ))
-        self.addSubview_(window.make_quit_button(
-            self, NSMakeRect(width - pad - 24, 11, 24, 24)
-        ))
 
     def openSettings_(self, sender):
         """Opens the settings window."""

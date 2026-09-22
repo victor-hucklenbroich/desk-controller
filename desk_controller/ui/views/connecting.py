@@ -5,7 +5,6 @@ from AppKit import (
 )
 from Foundation import NSObject, NSMakeRect
 
-import constants
 from constants import LOGGER
 from ui import window
 from ui import theme
@@ -32,9 +31,15 @@ class EstablishingConnectionView(NSView):
         """Initializes and positions all UI elements within the popover."""
         pad = theme.PAD
         width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
+
+        # Controls: quit
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
 
         spinner = NSProgressIndicator.alloc().initWithFrame_(
-            NSMakeRect((width - 20) / 2, 108, 20, 20)
+            NSMakeRect((width - 20) / 2, 86, 20, 20)
         )
         spinner.setStyle_(NSProgressIndicatorStyleSpinning)
         spinner.setControlSize_(NSControlSizeSmall)
@@ -43,17 +48,8 @@ class EstablishingConnectionView(NSView):
         self.addSubview_(spinner)
 
         self.addSubview_(theme.label(
-            "Connecting to your desk…", NSMakeRect(pad, 78, width - 2 * pad, 22),
+            "Connecting to your desk…", NSMakeRect(pad, 56, width - 2 * pad, 22),
             size=15, color=NSColor.secondaryLabelColor(), align=theme.ALIGN_CENTER,
-        ))
-
-        # Footer: version + quit
-        self.addSubview_(theme.label(
-            constants.VERSION, NSMakeRect(pad, 13, 120, 16),
-            size=11, color=NSColor.tertiaryLabelColor(),
-        ))
-        self.addSubview_(window.make_quit_button(
-            self, NSMakeRect(width - pad - 24, 11, 24, 24)
         ))
 
     def quitApp_(self, sender):

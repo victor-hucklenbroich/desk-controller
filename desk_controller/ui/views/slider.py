@@ -54,23 +54,31 @@ class SliderView(NSView):
         """Initializes and positions all UI elements within the popover."""
         pad = theme.PAD
         width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
         inner = width - 2 * pad
 
-        # Caption
+        # Controls: settings and quit
+        self.addSubview_(window.make_settings_button(
+            self, NSMakeRect(width - pad - 54, height - 38, 24, 24)
+        ))
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
+
         self.addSubview_(theme.label(
-            "Desk height", NSMakeRect(pad, 160, inner, 14),
+            "Desk height", NSMakeRect(pad, 136, inner - 70, 14),
             size=11, color=NSColor.secondaryLabelColor(),
         ))
         self.value_label = theme.label(
             self._formatHeight(self.app.current_height),
-            NSMakeRect(pad, 130, inner, 32),
+            NSMakeRect(pad, 106, inner - 70, 32),
             size=26, weight=theme.WEIGHT_SEMIBOLD,
         )
         self.addSubview_(self.value_label)
 
         # Height slider
         self.slider = NSSlider.alloc().initWithFrame_(
-            NSMakeRect(pad, 105, inner, 20)
+            NSMakeRect(pad, 81, inner, 20)
         )
         custom_cell = SliderCell.alloc().init()
         self.slider.setCell_(custom_cell)
@@ -83,12 +91,12 @@ class SliderView(NSView):
 
         # Min / max range captions beneath the slider ends
         self.min_label = theme.label(
-            f"{constants.MIN_HEIGHT:.0f} cm", NSMakeRect(pad, 89, 80, 14),
+            f"{constants.MIN_HEIGHT:.0f} cm", NSMakeRect(pad, 65, 80, 14),
             size=11, color=NSColor.tertiaryLabelColor(), align=theme.ALIGN_LEFT,
         )
         self.addSubview_(self.min_label)
         self.max_label = theme.label(
-            f"{constants.MAX_HEIGHT:.0f} cm", NSMakeRect(width - pad - 80, 89, 80, 14),
+            f"{constants.MAX_HEIGHT:.0f} cm", NSMakeRect(width - pad - 80, 65, 80, 14),
             size=11, color=NSColor.tertiaryLabelColor(), align=theme.ALIGN_RIGHT,
         )
         self.addSubview_(self.max_label)
@@ -97,7 +105,7 @@ class SliderView(NSView):
         gap = 12
         button_w = (inner - gap) / 2
         self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(pad, 42, button_w, 34)
+            NSMakeRect(pad, 18, button_w, 34)
         )
         self.sit_button.setTitle_("Sit")
         self.sit_button.setBezelStyle_(2)
@@ -106,25 +114,13 @@ class SliderView(NSView):
         self.addSubview_(self.sit_button)
 
         self.stand_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(pad + button_w + gap, 42, button_w, 34)
+            NSMakeRect(pad + button_w + gap, 18, button_w, 34)
         )
         self.stand_button.setTitle_("Stand")
         self.stand_button.setBezelStyle_(2)
         self.stand_button.setTarget_(self)
         self.stand_button.setAction_("shortcutStand:")
         self.addSubview_(self.stand_button)
-
-        # Footer: version, settings and quit
-        self.addSubview_(theme.label(
-            constants.VERSION, NSMakeRect(pad, 13, 120, 16),
-            size=11, color=NSColor.tertiaryLabelColor(),
-        ))
-        self.addSubview_(window.make_settings_button(
-            self, NSMakeRect(width - pad - 54, 11, 24, 24)
-        ))
-        self.addSubview_(window.make_quit_button(
-            self, NSMakeRect(width - pad - 24, 11, 24, 24)
-        ))
 
     @objc.python_method
     def _formatHeight(self, cm):

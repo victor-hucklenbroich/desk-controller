@@ -3,7 +3,6 @@ import objc
 from AppKit import NSApp, NSView, NSColor, NSTextField
 from Foundation import NSObject, NSMakeRect
 
-import constants
 from constants import LOGGER
 from control import config
 from ui import window
@@ -31,22 +30,28 @@ class InitialSetupView(NSView):
         """Initializes and positions all UI elements within the popover."""
         pad = theme.PAD
         width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
         inner = width - 2 * pad
 
-        # Title + subtitle
+        # Controls: quit
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
+
+        # Header
         self.addSubview_(theme.label(
-            "Welcome to DeskController", NSMakeRect(pad, 150, inner, 22),
-            size=16, weight=theme.WEIGHT_SEMIBOLD, align=theme.ALIGN_CENTER,
+            "Welcome to DeskController", NSMakeRect(pad, 128, inner - 70, 22),
+            size=16, weight=theme.WEIGHT_SEMIBOLD,
         ))
         self.addSubview_(theme.label(
             "Enter your desk's Bluetooth address to get started",
-            NSMakeRect(pad, 128, inner, 18),
-            size=12, color=NSColor.secondaryLabelColor(), align=theme.ALIGN_CENTER,
+            NSMakeRect(pad, 104, inner, 18),
+            size=12, color=NSColor.secondaryLabelColor(),
         ))
 
         # UUID field
         self.uuid_field = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(pad, 90, inner, 24)
+            NSMakeRect(pad, 64, inner, 24)
         )
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setBezeled_(True)
@@ -60,7 +65,7 @@ class InitialSetupView(NSView):
 
         # Connect button (primary, default action)
         connect_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect((width - 120) / 2, 48, 120, 30)
+            NSMakeRect((width - 120) / 2, 18, 120, 30)
         )
         connect_button.setTitle_("Connect")
         connect_button.setBezelStyle_(1)
@@ -68,15 +73,6 @@ class InitialSetupView(NSView):
         connect_button.setTarget_(self)
         connect_button.setAction_("connect:")
         self.addSubview_(connect_button)
-
-        # Footer: version + quit
-        self.addSubview_(theme.label(
-            constants.VERSION, NSMakeRect(pad, 13, 120, 16),
-            size=11, color=NSColor.tertiaryLabelColor(),
-        ))
-        self.addSubview_(window.make_quit_button(
-            self, NSMakeRect(width - pad - 24, 11, 24, 24)
-        ))
 
     def viewDidMoveToWindow(self):
         if self.window() is not None:
