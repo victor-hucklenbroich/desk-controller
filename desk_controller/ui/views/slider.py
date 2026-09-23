@@ -141,8 +141,9 @@ class SliderView(NSView):
         """Function to update all dynamic UI elements."""
         # height display update
         if update_text:
+            title = f"{height_value:>4}cm " if constants.CONFIG_SHOW_HEIGHT else ""
             attr_title = NSAttributedString.alloc().initWithString_attributes_(
-                f"{height_value:>4}cm ", {NSFontAttributeName: constants.MONO_FONT}
+                title, {NSFontAttributeName: constants.MONO_FONT}
             )
             status_item.button().setAttributedTitle_(attr_title)
 

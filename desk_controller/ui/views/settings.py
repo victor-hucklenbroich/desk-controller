@@ -10,7 +10,7 @@ from ui import theme
 
 
 SETTINGS_WIDTH = 390
-SETTINGS_HEIGHT = 250
+SETTINGS_HEIGHT = 294
 
 
 class SettingsView(NSView):
@@ -34,25 +34,35 @@ class SettingsView(NSView):
     def buildUI(self):
         """Initializes and positions all UI elements within the settings window."""
         # Desk address
-        self.addSubview_(self._fieldLabel_("Desk address", 214))
-        self.uuid_field = self._textField_(188)
+        self.addSubview_(self._fieldLabel_("Desk address", 258))
+        self.uuid_field = self._textField_(232)
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.addSubview_(self.uuid_field)
 
         # Sit preset
-        self.addSubview_(self._fieldLabel_("Sit preset height (cm)", 154))
-        self.sit_slider = self._presetSlider_(130, constants.CONFIG_SIT)
+        self.addSubview_(self._fieldLabel_("Sit preset height (cm)", 198))
+        self.sit_slider = self._presetSlider_(174, constants.CONFIG_SIT)
         self.addSubview_(self.sit_slider)
-        self.sit_value = self._valueLabel_(132, constants.CONFIG_SIT)
+        self.sit_value = self._valueLabel_(176, constants.CONFIG_SIT)
         self.addSubview_(self.sit_value)
 
         # Stand preset
-        self.addSubview_(self._fieldLabel_("Stand preset height (cm)", 94))
-        self.stand_slider = self._presetSlider_(70, constants.CONFIG_STAND)
+        self.addSubview_(self._fieldLabel_("Stand preset height (cm)", 138))
+        self.stand_slider = self._presetSlider_(114, constants.CONFIG_STAND)
         self.addSubview_(self.stand_slider)
-        self.stand_value = self._valueLabel_(72, constants.CONFIG_STAND)
+        self.stand_value = self._valueLabel_(116, constants.CONFIG_STAND)
         self.addSubview_(self.stand_value)
+
+        # Menu bar height readout toggle
+        self.show_height_checkbox = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(20, 72, 350, 20)
+        )
+        self.show_height_checkbox.setButtonType_(3)  # NSButtonTypeSwitch (checkbox)
+        self.show_height_checkbox.setTitle_("Show desk height in menu bar")
+        self.show_height_checkbox.setFont_(theme.font(13))
+        self.show_height_checkbox.setState_(1 if constants.CONFIG_SHOW_HEIGHT else 0)
+        self.addSubview_(self.show_height_checkbox)
 
         # Version label
         self.addSubview_(theme.label(
@@ -142,10 +152,14 @@ class SettingsView(NSView):
         uuid = self.uuid_field.stringValue().strip()
         sit = int(round(self.sit_slider.doubleValue()))
         stand = int(round(self.stand_slider.doubleValue()))
+        show_height = self.show_height_checkbox.state() == 1
 
         uuid_changed = uuid != "" and uuid != constants.CONFIG_UUID
-        LOGGER.info(f"Saving settings (uuid_changed={uuid_changed}, sit={sit}, stand={stand})")
-        config.ConfigParser.update(uuid, sit, stand)
+        LOGGER.info(
+            f"Saving settings (uuid_changed={uuid_changed}, sit={sit}, "
+            f"stand={stand}, show_height={show_height})"
+        )
+        config.ConfigParser.update(uuid, sit, stand, show_height)
 
         self.app.closeSettings()
 
@@ -153,6 +167,7 @@ class SettingsView(NSView):
         if uuid_changed:
             self.app.desk.retry()
         self.app.checkAndUpdatePopover()
+        self.app.refreshStatusItem()
 
     def cancel_(self, sender):
         """Discards changes and closes the settings window."""

@@ -273,7 +273,16 @@ class MenuBarApp(NSObject):
             button.setImagePosition_(1)
             button.setAttributedTitle_(NSAttributedString.alloc().initWithString_(""))
         else: # SLIDER
+            # Icon only (1) when the height readout is hidden, icon + title (3) otherwise.
+            button.setImagePosition_(3 if constants.CONFIG_SHOW_HEIGHT else 1)
             SliderView.updateUI(self.status_item, None, self.current_height, False)
+
+    @objc.python_method
+    def refreshStatusItem(self):
+        """Re-applies the menu bar icon/title for the current state, e.g. after a
+        settings change toggles the height readout on or off."""
+        if self.current_content is not None:
+            self._updateStatusItem(self.current_content)
 
     @objc.python_method
     def _startStatusSpinner(self):
@@ -326,6 +335,7 @@ class MenuBarApp(NSObject):
             if not self.settings_window.setFrameUsingName_(SETTINGS_FRAME_NAME):
                 self.settings_window.center()
             self.settings_window.setFrameAutosaveName_(SETTINGS_FRAME_NAME)
+            self.settings_window.setContentSize_(NSSize(SETTINGS_WIDTH, SETTINGS_HEIGHT))
 
         self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
         Cocoa.NSApp.activateIgnoringOtherApps_(True)
