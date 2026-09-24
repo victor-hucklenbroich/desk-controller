@@ -20,6 +20,8 @@ from ui.views.no_connection import NoConnectionView
 from ui.views.settings import SettingsView, SETTINGS_WIDTH, SETTINGS_HEIGHT
 from ui.timer import _TimerProxy
 from ui import window
+from ui import glass
+from ui import theme
 from control.desk_service import DeskService
 from constants import LOGGER
 import constants
@@ -96,7 +98,7 @@ class MenuBarApp(NSObject):
     def showPopover(self):
         """Creates and displays the popover window below the menu bar icon."""
         if self.popover_window is None:
-            rect = NSMakeRect(0, 0, 364, 120)
+            rect = NSMakeRect(0, 0, theme.POPOVER_WIDTH, theme.POPOVER_HEIGHT)
             self.popover_window = KeyableWindow.alloc().initWithContentRect_styleMask_backing_defer_(
                 rect,
                 NSWindowStyleMaskBorderless,
@@ -106,6 +108,7 @@ class MenuBarApp(NSObject):
 
             self.popover_window.setOpaque_(False)
             self.popover_window.setBackgroundColor_(NSColor.clearColor())
+            self.popover_window.setHasShadow_(False)
             self.popover_window.setLevel_(3)
 
         self.checkAndUpdatePopover()
@@ -119,6 +122,7 @@ class MenuBarApp(NSObject):
         y = button_frame.origin.y - window_frame.size.height - 8
 
         self.popover_window.setFrameOrigin_((x, y))
+        Cocoa.NSApp.activateIgnoringOtherApps_(True)
         self.popover_window.makeKeyAndOrderFront_(None)
 
         self.is_visible = True
@@ -169,7 +173,8 @@ class MenuBarApp(NSObject):
 
     @objc.python_method
     def _renderContentView(self, state):
-        """Builds and installs the popover content view for the given state."""
+        """Builds the popover content view for the given state and installs it
+        inside the Liquid Glass container that backs the popover window."""
         self.slider_view = None
         if state == ContentViews.SETUP:
             content_view = InitialSetupView.alloc().initWithApp_(self)
@@ -180,7 +185,12 @@ class MenuBarApp(NSObject):
             self.slider_view = content_view
         else:
             content_view = EstablishingConnectionView.alloc().initWithApp_(self)
-        self.popover_window.setContentView_(content_view)
+
+        container = glass.make_container(
+            theme.POPOVER_WIDTH, theme.POPOVER_HEIGHT, theme.POPOVER_RADIUS
+        )
+        glass.set_content(container, content_view)
+        self.popover_window.setContentView_(container)
 
     @objc.python_method
     def deskHeightChanged(self, height_cm, moving):
@@ -200,6 +210,8 @@ class MenuBarApp(NSObject):
         # App-initiated moves only drag the slider handle along when requested
         move_handle = (not self.move_in_progress) or self.move_slider_handle
         slider = self.slider_view.slider if self.slider_view is not None else None
+        if self.slider_view is not None:
+            self.slider_view.refreshHeight_(height_cm)
         SliderView.updateUI(
             self.status_item, slider, height_cm,
             slider is not None and move_handle,
@@ -261,7 +273,16 @@ class MenuBarApp(NSObject):
             button.setImagePosition_(1)
             button.setAttributedTitle_(NSAttributedString.alloc().initWithString_(""))
         else: # SLIDER
+            # Icon only (1) when the height readout is hidden, icon + title (3) otherwise.
+            button.setImagePosition_(3 if constants.CONFIG_SHOW_HEIGHT else 1)
             SliderView.updateUI(self.status_item, None, self.current_height, False)
+
+    @objc.python_method
+    def refreshStatusItem(self):
+        """Re-applies the menu bar icon/title for the current state, e.g. after a
+        settings change toggles the height readout on or off."""
+        if self.current_content is not None:
+            self._updateStatusItem(self.current_content)
 
     @objc.python_method
     def _startStatusSpinner(self):
@@ -314,6 +335,7 @@ class MenuBarApp(NSObject):
             if not self.settings_window.setFrameUsingName_(SETTINGS_FRAME_NAME):
                 self.settings_window.center()
             self.settings_window.setFrameAutosaveName_(SETTINGS_FRAME_NAME)
+            self.settings_window.setContentSize_(NSSize(SETTINGS_WIDTH, SETTINGS_HEIGHT))
 
         self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
         Cocoa.NSApp.activateIgnoringOtherApps_(True)

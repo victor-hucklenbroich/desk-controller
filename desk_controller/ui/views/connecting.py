@@ -1,18 +1,22 @@
-import Cocoa
 import objc
 from AppKit import (
-    NSApplication, NSStatusBar, NSVariableStatusItemLength,
-    NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
-    NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
-    NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
-    NSAttributedString, NSFontAttributeName, NSProgressIndicator,
-    NSProgressIndicatorStyleSpinning, NSControlSizeSmall
+    NSView, NSColor, NSImageView, NSImageScaleAxesIndependently,
 )
-from Foundation import NSObject, NSMakeRect
+from Foundation import (
+    NSMakeRect, NSTimer, NSRunLoop, NSRunLoopCommonModes,
+)
 
 import constants
 from constants import LOGGER
 from ui import window
+from ui import theme
+
+
+# Seconds between sprite frames
+FRAME_INTERVAL = 0.06
+
+ICON_W = 48
+ICON_H = 39
 
 
 class EstablishingConnectionView(NSView):
@@ -26,65 +30,81 @@ class EstablishingConnectionView(NSView):
             return None
 
         self.app = app
-        frame = NSMakeRect(0, 0, 364, 120)
+        self._frames = constants.ICON_FRAMES
+        self._frame_index = 0
+        self._frame_step = 1
+        self._timer = None
+        frame = NSMakeRect(0, 0, theme.POPOVER_WIDTH, theme.POPOVER_HEIGHT)
         self = self.initWithFrame_(frame)
-        self.setWantsLayer_(True)
-        self.layer().setCornerRadius_(12)
         self.buildUI()
 
         return self
 
     def buildUI(self):
         """Initializes and positions all UI elements within the popover."""
-        spinner = NSProgressIndicator.alloc().initWithFrame_(
-            NSMakeRect(185, 30, 18, 18)
+        pad = theme.PAD
+        width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
+
+        # Controls: quit
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
+
+        self.icon_view = NSImageView.alloc().initWithFrame_(
+            NSMakeRect((width - ICON_W) / 2, 80, ICON_W, ICON_H)
         )
-        spinner.setStyle_(NSProgressIndicatorStyleSpinning)
-        spinner.setControlSize_(NSControlSizeSmall)
-        spinner.setDisplayedWhenStopped_(False)
-        spinner.startAnimation_(None)
-        self.addSubview_(spinner)
+        self.icon_view.setImageScaling_(NSImageScaleAxesIndependently)
+        self.icon_view.setContentTintColor_(NSColor.secondaryLabelColor())
+        self.icon_view.setImage_(self._frames[self._frame_index])
+        self.addSubview_(self.icon_view)
 
-        # Title label
-        error_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(95, 50, 210, 30)
+        self.addSubview_(theme.label(
+            "Connecting to your desk…", NSMakeRect(pad, 54, width - 2 * pad, 22),
+            size=15, color=NSColor.secondaryLabelColor(), align=theme.ALIGN_CENTER,
+        ))
+
+    def viewDidMoveToWindow(self):
+        """Runs the sprite animation only while the view is on screen."""
+        if self.window() is None:
+            self._stopAnimation()
+        else:
+            self._startAnimation()
+
+    @objc.python_method
+    def _startAnimation(self):
+        if self._timer is not None:
+            return
+        self._frame_index = 0
+        self._frame_step = 1
+        self.icon_view.setImage_(self._frames[self._frame_index])
+        self._timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
+            FRAME_INTERVAL, self, "advanceFrame:", None, True
         )
-        error_label.setStringValue_("Connecting to your Desk...")
-        error_label.setBezeled_(False)
-        error_label.setDrawsBackground_(False)
-        error_label.setEditable_(False)
-        error_label.setSelectable_(False)
-        error_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.6))
-        error_label.setFont_(NSFont.systemFontOfSize_(15))
-        error_label.setAlignment_(0)
-        self.addSubview_(error_label)
+        NSRunLoop.currentRunLoop().addTimer_forMode_(self._timer, NSRunLoopCommonModes)
 
-        # Version label
-        version_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 8, 90, 16)
-        )
-        version_label.setStringValue_(constants.VERSION)
-        version_label.setBezeled_(False)
-        version_label.setDrawsBackground_(False)
-        version_label.setEditable_(False)
-        version_label.setSelectable_(False)
-        version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
-        version_label.setFont_(NSFont.systemFontOfSize_(12))
-        version_label.setAlignment_(0)
-        self.addSubview_(version_label)
+    @objc.python_method
+    def _stopAnimation(self):
+        if self._timer is not None:
+            self._timer.invalidate()
+            self._timer = None
 
-        # App Quit button
-        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
-        quit_button.setTitle_("Quit")
-        quit_button.setBezelStyle_(8)
-        quit_button.setTarget_(self)
-        quit_button.setAction_("quitApp:")
-        self.addSubview_(quit_button)
-
-    def drawRect_(self, rect):
-        window.draw_rect(rect)
+    def advanceFrame_(self, timer):
+        last = len(self._frames) - 1
+        self._frame_index += self._frame_step
+        if self._frame_index >= last:
+            self._frame_index = last
+            self._frame_step = -1
+        elif self._frame_index <= 0:
+            self._frame_index = 0
+            self._frame_step = 1
+        self.icon_view.setImage_(self._frames[self._frame_index])
 
     def quitApp_(self, sender):
         """Shuts down the controller server and exits the application."""
         LOGGER.debug("Quit button pressed")
         self.app.quit()
+
+    def dealloc(self):
+        self._stopAnimation()
+        objc.super(EstablishingConnectionView, self).dealloc()

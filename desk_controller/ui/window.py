@@ -71,43 +71,39 @@ def install_main_menu(app):
         LOGGER.exception("window.install_main_menu() failed: %s", e)
 
 
-def make_settings_button(target, frame):
-    """Builds a gear icon button wired to the openSettings action."""
+def make_icon_button(symbol, fallback, tooltip, target, action, frame):
+    """Builds a borderless SF Symbol icon button for the popover footer.
+
+    Falls back to a glyph title when the symbol is unavailable. The tint is left
+    at ``secondaryLabelColor`` so the control reads as a quiet, vibrant affordance
+    over the glass, the way the native menu-bar widgets style their small buttons.
+    """
     button = Cocoa.NSButton.alloc().initWithFrame_(frame)
-    gear = NSImage.imageWithSystemSymbolName_accessibilityDescription_("gearshape", "Settings")
-    if gear is not None:
-        button.setImage_(gear)
+    image = NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, tooltip)
+    if image is not None:
+        button.setImage_(image)
         button.setImagePosition_(1)  # NSImageOnly
     else:
-        button.setTitle_("⚙")
+        button.setTitle_(fallback)
     button.setBezelStyle_(8)
-
     button.setBordered_(False)
     button.setContentTintColor_(NSColor.secondaryLabelColor())
     button.setFocusRingType_(1)  # NSFocusRingTypeNone
+    button.setToolTip_(tooltip)
     button.setTarget_(target)
-    button.setAction_("openSettings:")
+    button.setAction_(action)
     return button
 
 
-def draw_rect(rect):
-    """Custom drawing code for the view's background and border."""
-    try:
-        outer_radius = 18.0
-        outer_path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, outer_radius, outer_radius)
+def make_settings_button(target, frame):
+    """Gear icon button wired to the openSettings: action."""
+    return make_icon_button(
+        "gearshape", "⚙", "Settings", target, "openSettings:", frame
+    )
 
-        bright = NSColor.colorWithCalibratedWhite_alpha_(0.95, 0.5)
-        bright.set()
-        outer_path.setLineWidth_(0.5)
-        outer_path.stroke()
 
-        inset_amount = 0.8
-        inner_rect = Cocoa.NSInsetRect(rect, inset_amount, inset_amount)
-        inner_radius = max(outer_radius - inset_amount, 7.0)
-        inner_path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(inner_rect, inner_radius, inner_radius)
-
-        NSColor.colorWithCalibratedRed_green_blue_alpha_(0.1, 0.1, 0.12, 0.9).setFill()
-        inner_path.stroke()
-        inner_path.fill()
-    except Exception as e:
-        LOGGER.exception("window.draw_rect() failed: %s", e)
+def make_quit_button(target, frame):
+    """Power icon button wired to the quitApp: action."""
+    return make_icon_button(
+        "power", "⏻", "Quit DeskController", target, "quitApp:", frame
+    )

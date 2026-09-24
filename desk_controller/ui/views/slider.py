@@ -1,17 +1,15 @@
 import Cocoa
 import objc
 from AppKit import (
-    NSApplication, NSStatusBar, NSVariableStatusItemLength,
-    NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
-    NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
-    NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
-    NSAttributedString, NSFontAttributeName
+    NSView, NSSlider, NSSliderCell, NSColor,
+    NSAttributedString, NSFontAttributeName,
 )
 from Foundation import NSObject, NSMakeRect
 
 import constants
 from constants import LOGGER
 from ui import window
+from ui import theme
 
 
 class SliderCell(NSSliderCell):
@@ -43,10 +41,8 @@ class SliderView(NSView):
             return None
 
         self.app = app
-        frame = NSMakeRect(0, 0, 364, 120)
+        frame = NSMakeRect(0, 0, theme.POPOVER_WIDTH, theme.POPOVER_HEIGHT)
         self = self.initWithFrame_(frame)
-        self.setWantsLayer_(True)
-        self.layer().setCornerRadius_(12)
         self.buildUI()
 
         if app.move_in_progress or app.external_move_active:
@@ -56,8 +52,33 @@ class SliderView(NSView):
 
     def buildUI(self):
         """Initializes and positions all UI elements within the popover."""
+        pad = theme.PAD
+        width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
+        inner = width - 2 * pad
+
+        # Controls: settings and quit
+        self.addSubview_(window.make_settings_button(
+            self, NSMakeRect(width - pad - 54, height - 38, 24, 24)
+        ))
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
+
+        self.addSubview_(theme.label(
+            "Desk height", NSMakeRect(pad, 136, inner - 70, 14),
+            size=11, color=NSColor.secondaryLabelColor(),
+        ))
+        self.value_label = theme.label(
+            self._formatHeight(self.app.current_height),
+            NSMakeRect(pad, 106, inner - 70, 32),
+            size=26, weight=theme.WEIGHT_SEMIBOLD,
+        )
+        self.addSubview_(self.value_label)
+
+        # Height slider
         self.slider = NSSlider.alloc().initWithFrame_(
-            NSMakeRect(22, 64, 320, 25)
+            NSMakeRect(pad, 81, inner, 20)
         )
         custom_cell = SliderCell.alloc().init()
         self.slider.setCell_(custom_cell)
@@ -68,79 +89,51 @@ class SliderView(NSView):
         self.slider.setAction_("sliderChanged:")
         self.addSubview_(self.slider)
 
-        # Labels for min/max height range
-        self.min_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(12, 90, 50, 16)
+        # Min / max range captions beneath the slider ends
+        self.min_label = theme.label(
+            f"{constants.MIN_HEIGHT:.0f} cm", NSMakeRect(pad, 65, 80, 14),
+            size=11, color=NSColor.tertiaryLabelColor(), align=theme.ALIGN_LEFT,
         )
-        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f}cm")
-        self.min_label.setBezeled_(False)
-        self.min_label.setDrawsBackground_(False)
-        self.min_label.setEditable_(False)
-        self.min_label.setSelectable_(False)
-        self.min_label.setTextColor_(NSColor.whiteColor())
-        self.min_label.setFont_(NSFont.systemFontOfSize_(12))
-        self.min_label.setAlignment_(2)
         self.addSubview_(self.min_label)
-
-        self.max_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(292, 90, 50, 16)
+        self.max_label = theme.label(
+            f"{constants.MAX_HEIGHT:.0f} cm", NSMakeRect(width - pad - 80, 65, 80, 14),
+            size=11, color=NSColor.tertiaryLabelColor(), align=theme.ALIGN_RIGHT,
         )
-        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f}cm")
-        self.max_label.setBezeled_(False)
-        self.max_label.setDrawsBackground_(False)
-        self.max_label.setEditable_(False)
-        self.max_label.setSelectable_(False)
-        self.max_label.setTextColor_(NSColor.whiteColor())
-        self.max_label.setFont_(NSFont.systemFontOfSize_(12))
-        self.max_label.setAlignment_(2)
         self.addSubview_(self.max_label)
 
-        # Version label
-        version_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 8, 90, 16)
+        # Sit / Stand preset buttons
+        gap = 12
+        button_w = (inner - gap) / 2
+        self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(pad, 18, button_w, 34)
         )
-        version_label.setStringValue_(constants.VERSION)
-        version_label.setBezeled_(False)
-        version_label.setDrawsBackground_(False)
-        version_label.setEditable_(False)
-        version_label.setSelectable_(False)
-        version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
-        version_label.setFont_(NSFont.systemFontOfSize_(12))
-        version_label.setAlignment_(0)
-        self.addSubview_(version_label)
-
-        self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(28, 38, 152, 25))
         self.sit_button.setTitle_("Sit")
         self.sit_button.setBezelStyle_(2)
         self.sit_button.setTarget_(self)
         self.sit_button.setAction_("shortcutSit:")
         self.addSubview_(self.sit_button)
 
-        self.stand_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(184, 38, 152, 25))
+        self.stand_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(pad + button_w + gap, 18, button_w, 34)
+        )
         self.stand_button.setTitle_("Stand")
         self.stand_button.setBezelStyle_(2)
         self.stand_button.setTarget_(self)
         self.stand_button.setAction_("shortcutStand:")
         self.addSubview_(self.stand_button)
 
-        # Settings button
-        self.addSubview_(window.make_settings_button(self, NSMakeRect(257, 5, 37, 27)))
+    @objc.python_method
+    def _formatHeight(self, cm):
+        return f"{int(round(cm))} cm"
 
-        # App Quit button
-        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
-        quit_button.setTitle_("Quit")
-        quit_button.setBezelStyle_(8)
-        quit_button.setTarget_(self)
-        quit_button.setAction_("quitApp:")
-        self.addSubview_(quit_button)
+    def refreshHeight_(self, cm):
+        """Updates the live height readout shown above the slider."""
+        self.value_label.setStringValue_(self._formatHeight(cm))
 
     def openSettings_(self, sender):
         """Opens the settings window."""
         LOGGER.debug("Settings button pressed")
         self.app.openSettings()
-
-    def drawRect_(self, rect):
-        window.draw_rect(rect)
 
     @staticmethod
     @objc.python_method
@@ -148,8 +141,9 @@ class SliderView(NSView):
         """Function to update all dynamic UI elements."""
         # height display update
         if update_text:
+            title = f"{height_value:>4}cm " if constants.CONFIG_SHOW_HEIGHT else ""
             attr_title = NSAttributedString.alloc().initWithString_attributes_(
-                f"{height_value:>4}cm ", {NSFontAttributeName: constants.MONO_FONT}
+                title, {NSFontAttributeName: constants.MONO_FONT}
             )
             status_item.button().setAttributedTitle_(attr_title)
 
@@ -173,8 +167,8 @@ class SliderView(NSView):
         """Applies the current desk-derived height limits to slider and labels."""
         self.slider.setMinValue_(constants.MIN_HEIGHT)
         self.slider.setMaxValue_(constants.MAX_HEIGHT)
-        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f}cm")
-        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f}cm")
+        self.min_label.setStringValue_(f"{constants.MIN_HEIGHT:.0f} cm")
+        self.max_label.setStringValue_(f"{constants.MAX_HEIGHT:.0f} cm")
 
     def sliderChanged_(self, sender):
         """Action for slider movements (empty, action is triggered upon release)."""

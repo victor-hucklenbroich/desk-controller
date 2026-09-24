@@ -1,23 +1,18 @@
 import Cocoa
 import objc
-from AppKit import (
-    NSApplication, NSStatusBar, NSVariableStatusItemLength,
-    NSWindow, NSView, NSSlider, NSSliderCell, NSTextField, NSFont,
-    NSColor, NSWindowStyleMaskBorderless, NSBackingStoreBuffered,
-    NSMenu, NSMenuItem, NSBezierPath, NSSize, NSImage,
-    NSAttributedString, NSFontAttributeName
-)
+from AppKit import NSView, NSColor, NSTextField
 from Foundation import NSObject, NSMakeRect
 
 import constants
 from constants import LOGGER
 from control import config
 from ui import window
+from ui import theme
 
 
 class NoConnectionView(NSView):
     """
-    UI View for communicating connection issues with the local server.
+    UI View shown when the desk connection could not be established.
     """
 
     def initWithApp_(self, app):
@@ -26,98 +21,68 @@ class NoConnectionView(NSView):
             return None
 
         self.app = app
-        frame = NSMakeRect(0, 0, 364, 120)
+        frame = NSMakeRect(0, 0, theme.POPOVER_WIDTH, theme.POPOVER_HEIGHT)
         self = self.initWithFrame_(frame)
-        self.setWantsLayer_(True)
-        self.layer().setCornerRadius_(12)
         self.buildUI()
 
         return self
 
     def buildUI(self):
         """Initializes and positions all UI elements within the popover."""
-        # Error label
-        error_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(38, 78, 295, 30)
-        )
-        error_label.setStringValue_("Could not connect to your Desk!")
-        error_label.setBezeled_(False)
-        error_label.setDrawsBackground_(False)
-        error_label.setEditable_(False)
-        error_label.setSelectable_(False)
-        error_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.8))
-        error_label.setFont_(NSFont.systemFontOfSize_(14))
-        error_label.setAlignment_(1)
-        self.addSubview_(error_label)
+        pad = theme.PAD
+        width = theme.POPOVER_WIDTH
+        height = theme.POPOVER_HEIGHT
+        inner = width - 2 * pad
 
-        error_sub_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 57, 325, 30)
-        )
-        error_sub_label.setStringValue_("Please check your UUID and Bluetooth connection")
-        error_sub_label.setBezeled_(False)
-        error_sub_label.setDrawsBackground_(False)
-        error_sub_label.setEditable_(False)
-        error_sub_label.setSelectable_(False)
-        error_sub_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.6))
-        error_sub_label.setFont_(NSFont.systemFontOfSize_(13))
-        error_sub_label.setAlignment_(1)
-        self.addSubview_(error_sub_label)
+        # Controls: settings and quit
+        self.addSubview_(window.make_settings_button(
+            self, NSMakeRect(width - pad - 54, height - 38, 24, 24)
+        ))
+        self.addSubview_(window.make_quit_button(
+            self, NSMakeRect(width - pad - 24, height - 38, 24, 24)
+        ))
 
-        # UUID field
+        # Header
+        self.addSubview_(theme.label(
+            "Couldn't connect to your desk", NSMakeRect(pad, 128, inner - 70, 22),
+            size=16, weight=theme.WEIGHT_SEMIBOLD,
+        ))
+        self.addSubview_(theme.label(
+            "Check the address and that Bluetooth is on",
+            NSMakeRect(pad, 104, inner, 18),
+            size=12, color=NSColor.secondaryLabelColor(),
+        ))
+
+        # UUID field (prefilled with the current address)
         self.uuid_field = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(12, 38, 338, 25)
+            NSMakeRect(pad, 64, inner, 24)
         )
-        self.uuid_field.setPlaceholderString_("Please enter the UUID of your desk and try again")
+        self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.uuid_field.setBezeled_(True)
+        self.uuid_field.setBezelStyle_(1)  # rounded bezel
         self.uuid_field.setDrawsBackground_(True)
         self.uuid_field.setEditable_(True)
         self.uuid_field.setSelectable_(True)
-        self.uuid_field.setTextColor_(NSColor.whiteColor())
-        self.uuid_field.setFont_(NSFont.systemFontOfSize_(12))
-        self.uuid_field.setAlignment_(0)
+        self.uuid_field.setFont_(theme.font(12))
+        self.uuid_field.setAlignment_(theme.ALIGN_CENTER)
         self.addSubview_(self.uuid_field)
 
-        # Version label
-        version_label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 8, 90, 16)
+        # Try again button (primary, default action)
+        retry_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect((width - 120) / 2, 18, 120, 30)
         )
-        version_label.setStringValue_(constants.VERSION)
-        version_label.setBezeled_(False)
-        version_label.setDrawsBackground_(False)
-        version_label.setEditable_(False)
-        version_label.setSelectable_(False)
-        version_label.setTextColor_(NSColor.colorWithCalibratedWhite_alpha_(1, 0.5))
-        version_label.setFont_(NSFont.systemFontOfSize_(12))
-        version_label.setAlignment_(0)
-        self.addSubview_(version_label)
-
-        # Retry button
-        retry_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(154, 5, 75, 27))
-        retry_button.setTitle_("Try again")
-        retry_button.setBezelStyle_(8)
+        retry_button.setTitle_("Try Again")
+        retry_button.setBezelStyle_(1)
+        retry_button.setKeyEquivalent_("\r")
         retry_button.setTarget_(self)
         retry_button.setAction_("retry:")
         self.addSubview_(retry_button)
-
-        # Settings button
-        self.addSubview_(window.make_settings_button(self, NSMakeRect(257, 5, 37, 27)))
-
-        # App Quit button
-        quit_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(295, 5, 57, 27))
-        quit_button.setTitle_("Quit")
-        quit_button.setBezelStyle_(8)
-        quit_button.setTarget_(self)
-        quit_button.setAction_("quitApp:")
-        self.addSubview_(quit_button)
 
     def openSettings_(self, sender):
         """Opens the settings window."""
         LOGGER.debug("Settings button pressed")
         self.app.openSettings()
-
-    def drawRect_(self, rect):
-        window.draw_rect(rect)
 
     def retry_(self, sender):
         """Triggers user initiated server retry"""
