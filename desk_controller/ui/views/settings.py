@@ -41,14 +41,14 @@ class SettingsView(NSView):
         self.addSubview_(self.uuid_field)
 
         # Sit preset
-        self.addSubview_(self._fieldLabel_("Sit preset height (cm)", 198))
+        self.addSubview_(self._fieldLabel_("\"Sit\" preset height", 198))
         self.sit_slider = self._presetSlider_(174, constants.CONFIG_SIT)
         self.addSubview_(self.sit_slider)
         self.sit_value = self._valueLabel_(176, constants.CONFIG_SIT)
         self.addSubview_(self.sit_value)
 
         # Stand preset
-        self.addSubview_(self._fieldLabel_("Stand preset height (cm)", 138))
+        self.addSubview_(self._fieldLabel_("\"Stand\" preset height", 138))
         self.stand_slider = self._presetSlider_(114, constants.CONFIG_STAND)
         self.addSubview_(self.stand_slider)
         self.stand_value = self._valueLabel_(116, constants.CONFIG_STAND)
@@ -79,14 +79,14 @@ class SettingsView(NSView):
         cancel_button.setAction_("cancel:")
         self.addSubview_(cancel_button)
 
-        # Save button
-        save_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(282, 18, 88, 30))
-        save_button.setTitle_("Save")
-        save_button.setBezelStyle_(1)
-        save_button.setKeyEquivalent_("\r")
-        save_button.setTarget_(self)
-        save_button.setAction_("save:")
-        self.addSubview_(save_button)
+        # Apply button
+        apply_button = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(282, 18, 88, 30))
+        apply_button.setTitle_("Apply")
+        apply_button.setBezelStyle_(1)
+        apply_button.setKeyEquivalent_("\r")
+        apply_button.setTarget_(self)
+        apply_button.setAction_("apply:")
+        self.addSubview_(apply_button)
 
     @objc.python_method
     def _fieldLabel_(self, text, y):
@@ -147,7 +147,7 @@ class SettingsView(NSView):
         elif sender is self.stand_slider:
             self.stand_value.setStringValue_(self._formatHeight(sender.doubleValue()))
 
-    def save_(self, sender):
+    def apply_(self, sender):
         """Persists the entered preferences to config.yaml and runtime constants."""
         uuid = self.uuid_field.stringValue().strip()
         sit = int(round(self.sit_slider.doubleValue()))
