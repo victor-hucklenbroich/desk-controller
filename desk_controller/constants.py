@@ -37,6 +37,7 @@ LOGGER = logging.getLogger(__name__)
 # --- Static Constants ---
 VERSION: str = "v1.4.0"
 PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
+MOCK_ADDRESS: str = "dev"
 
 # --- Desk height limits (cm, floats for mm precision) ---
 # Defaults match a typical Idasen (620-1270mm) and are refined per desk

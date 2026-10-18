@@ -12,6 +12,7 @@ import constants
 from constants import LOGGER
 from control.config import ConfigParser
 from control.linak.desk import Desk
+from control.linak.mock import MockDeskClient
 from control.linak.util import Height
 
 
@@ -185,7 +186,11 @@ class DeskService(NSObject):
                 if uuid == constants.PLACEHOLDER_UUID:
                     self._request_state(DeskState.IDLE)
                     return
-                client = BleakClient(
+                client_cls = (
+                    MockDeskClient if uuid.strip().lower() == constants.MOCK_ADDRESS
+                    else BleakClient
+                )
+                client = client_cls(
                     uuid, disconnected_callback=self._on_ble_disconnected
                 )
                 try:
