@@ -41,6 +41,7 @@ class ContentViews(Enum):
     CONNECTING = 1
     SLIDER = 2
     NOCON = 3
+    DISCONNECTED = 4  # not connected because auto-connect is off
 
 class MenuBarApp(NSObject):
     """
@@ -159,6 +160,8 @@ class MenuBarApp(NSObject):
             required = ContentViews.NOCON
         elif self.desk.is_healthy():
             required = ContentViews.SLIDER
+        elif self.desk.is_idle():
+            required = ContentViews.DISCONNECTED
         else:
             required = ContentViews.CONNECTING
 
@@ -178,7 +181,7 @@ class MenuBarApp(NSObject):
         self.slider_view = None
         if state == ContentViews.SETUP:
             content_view = InitialSetupView.alloc().initWithApp_(self)
-        elif state == ContentViews.NOCON:
+        elif state in (ContentViews.NOCON, ContentViews.DISCONNECTED):
             content_view = NoConnectionView.alloc().initWithApp_(self)
         elif state == ContentViews.SLIDER:
             content_view = SliderView.alloc().initWithApp_(self)
@@ -257,6 +260,7 @@ class MenuBarApp(NSObject):
         button = self.status_item.button()
         button.setImage_(self._deskFrame())
         button.setImagePosition_(3)
+        button.setAppearsDisabled_(state == ContentViews.DISCONNECTED)
 
         if state == ContentViews.CONNECTING:
             self._startStatusSpinner()
@@ -269,7 +273,7 @@ class MenuBarApp(NSObject):
                     "⚠︎ ", {NSFontAttributeName: constants.MONO_FONT}
                 )
             )
-        elif state == ContentViews.SETUP:
+        elif state in (ContentViews.SETUP, ContentViews.DISCONNECTED):
             button.setImagePosition_(1)
             button.setAttributedTitle_(NSAttributedString.alloc().initWithString_(""))
         else: # SLIDER

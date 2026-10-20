@@ -59,6 +59,7 @@ DEFAULT_CONFIG: dict = {
     "presets": {"sit": 750, "stand": 1240},
     "max_height": 1270,
     "show_height": True,
+    "auto_connect": True,
 }
 
 if not os.path.exists(CONFIG_FILE_PATH):
@@ -81,6 +82,8 @@ CONFIG_STAND: int = int(int(_presets.get("stand", 1240)) / 10)
 
 # Whether the current desk height is shown next to the menu bar icon.
 CONFIG_SHOW_HEIGHT: bool = bool(CONFIG.get("show_height", True))
+
+CONFIG_AUTO_CONNECT: bool = bool(CONFIG.get("auto_connect", True))
 
 # Height of the tabletop above ground at the lowest position (mm);
 # read from the desk controller during connect when unset.

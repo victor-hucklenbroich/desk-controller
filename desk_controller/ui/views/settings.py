@@ -10,7 +10,7 @@ from ui import theme
 
 
 SETTINGS_WIDTH = 390
-SETTINGS_HEIGHT = 294
+SETTINGS_HEIGHT = 324
 
 
 class SettingsView(NSView):
@@ -34,11 +34,17 @@ class SettingsView(NSView):
     def buildUI(self):
         """Initializes and positions all UI elements within the settings window."""
         # Desk address
-        self.addSubview_(self._fieldLabel_("Desk address", 258))
-        self.uuid_field = self._textField_(232)
+        self.addSubview_(self._fieldLabel_("Desk address", 288))
+        self.uuid_field = self._textField_(262)
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.addSubview_(self.uuid_field)
+
+        # Automatic (re)connection toggle
+        self.auto_connect_checkbox = self._checkbox_(
+            "Automatically connect to desk", 232, constants.CONFIG_AUTO_CONNECT
+        )
+        self.addSubview_(self.auto_connect_checkbox)
 
         # Sit preset
         self.addSubview_(self._fieldLabel_("\"Sit\" preset height", 198))
@@ -55,13 +61,9 @@ class SettingsView(NSView):
         self.addSubview_(self.stand_value)
 
         # Menu bar height readout toggle
-        self.show_height_checkbox = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(20, 72, 350, 20)
+        self.show_height_checkbox = self._checkbox_(
+            "Show desk height in menu bar", 72, constants.CONFIG_SHOW_HEIGHT
         )
-        self.show_height_checkbox.setButtonType_(3)  # NSButtonTypeSwitch (checkbox)
-        self.show_height_checkbox.setTitle_("Show desk height in menu bar")
-        self.show_height_checkbox.setFont_(theme.font(13))
-        self.show_height_checkbox.setState_(1 if constants.CONFIG_SHOW_HEIGHT else 0)
         self.addSubview_(self.show_height_checkbox)
 
         # Version label
@@ -110,6 +112,16 @@ class SettingsView(NSView):
         return field
 
     @objc.python_method
+    def _checkbox_(self, title, y, checked):
+        """Builds a full-width checkbox for a boolean preference."""
+        checkbox = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(20, y, 350, 20))
+        checkbox.setButtonType_(3)  # NSButtonTypeSwitch (checkbox)
+        checkbox.setTitle_(title)
+        checkbox.setFont_(theme.font(13))
+        checkbox.setState_(1 if checked else 0)
+        return checkbox
+
+    @objc.python_method
     def _presetSlider_(self, y, value):
         """Builds a preset height slider spanning the desk's travel range,
         mirroring the main popover control. Continuous so the value indicator
@@ -153,18 +165,19 @@ class SettingsView(NSView):
         sit = int(round(self.sit_slider.doubleValue()))
         stand = int(round(self.stand_slider.doubleValue()))
         show_height = self.show_height_checkbox.state() == 1
+        auto_connect = self.auto_connect_checkbox.state() == 1
 
         uuid_changed = uuid != "" and uuid != constants.CONFIG_UUID
+        auto_connect_enabled = auto_connect and not constants.CONFIG_AUTO_CONNECT
         LOGGER.info(
             f"Saving settings (uuid_changed={uuid_changed}, sit={sit}, "
-            f"stand={stand}, show_height={show_height})"
+            f"stand={stand}, show_height={show_height}, auto_connect={auto_connect})"
         )
-        config.ConfigParser.update(uuid, sit, stand, show_height)
+        config.ConfigParser.update(uuid, sit, stand, show_height, auto_connect)
 
         self.app.closeSettings()
 
-        # A new UUID requires reconnecting to the new desk.
-        if uuid_changed:
+        if uuid_changed or (auto_connect_enabled and not self.app.desk.is_healthy()):
             self.app.desk.retry()
         self.app.checkAndUpdatePopover()
         self.app.refreshStatusItem()

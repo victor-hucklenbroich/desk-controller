@@ -16,7 +16,8 @@ class ConfigParser:
                 return {}
 
     @staticmethod
-    def update(uuid: str = "", sit: int = -1, stand: int = -1, show_height: bool = None):
+    def update(uuid: str = "", sit: int = -1, stand: int = -1, show_height: bool = None,
+               auto_connect: bool = None):
         if uuid != "":
             constants.CONFIG_UUID = uuid
         if sit != -1:
@@ -25,6 +26,8 @@ class ConfigParser:
             constants.CONFIG_STAND = stand
         if show_height is not None:
             constants.CONFIG_SHOW_HEIGHT = show_height
+        if auto_connect is not None:
+            constants.CONFIG_AUTO_CONNECT = auto_connect
 
         config = ConfigParser.parse()
         config["mac_address"] = str(constants.CONFIG_UUID)
@@ -32,6 +35,7 @@ class ConfigParser:
         config["presets"]["sit"] = int(constants.CONFIG_SIT) * 10
         config["presets"]["stand"] = int(constants.CONFIG_STAND) * 10
         config["show_height"] = bool(constants.CONFIG_SHOW_HEIGHT)
+        config["auto_connect"] = bool(constants.CONFIG_AUTO_CONNECT)
         with open(constants.CONFIG_FILE_PATH, 'w') as out:
             yaml.safe_dump(config, out, default_flow_style=False)
         LOGGER.info("Updated config.yaml with updated preferences")

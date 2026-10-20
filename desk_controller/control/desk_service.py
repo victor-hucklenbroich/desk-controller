@@ -72,7 +72,7 @@ class DeskService(NSObject):
         )
         self._thread.start()
         self._registerWorkspaceObservers()
-        self._beginConnect("initial start")
+        self._beginAutoConnect("initial start")
 
     @objc.python_method
     def stop(self):
@@ -96,7 +96,8 @@ class DeskService(NSObject):
 
     @objc.python_method
     def retry(self):
-        """User-initiated (re)connect: after setup, a UUID change, or DEAD."""
+        """User-initiated (re)connect: after setup, a UUID change, DEAD, or
+        while auto-connect is off."""
         self._beginConnect("user retry")
 
     @objc.python_method
@@ -106,6 +107,10 @@ class DeskService(NSObject):
     @objc.python_method
     def is_dead(self):
         return self._state == DeskState.DEAD
+
+    @objc.python_method
+    def is_idle(self):
+        return self._state == DeskState.IDLE
 
     @objc.python_method
     def move_to_cm(self, target_cm, on_done=None):
@@ -166,6 +171,16 @@ class DeskService(NSObject):
         )
 
     @objc.python_method
+    def _beginAutoConnect(self, reason, initial_delay=0.0):
+        """Connect without the user asking (launch, wake), unless auto-connect
+        is turned off. Main thread only."""
+        if not constants.CONFIG_AUTO_CONNECT:
+            LOGGER.info(f"Auto-connect is off; not connecting ({reason})")
+            self._applyState(DeskState.IDLE)
+            return
+        self._beginConnect(reason, initial_delay)
+
+    @objc.python_method
     async def _recycle_and_connect(self, initial_delay=0.0):
         self._cancel_auto_retry()
         await self._disconnect_current()
@@ -220,10 +235,7 @@ class DeskService(NSObject):
                     await self._safe_disconnect(client)
                     failures += 1
                     if failures >= constants.MAX_RECONNECT_FAILURES:
-                        LOGGER.error(
-                            "Desk unreachable after retries; will keep retrying "
-                            f"every {constants.AUTO_RETRY_DELAY:.0f}s"
-                        )
+                        LOGGER.error("Desk unreachable after retries")
                         self._request_state(DeskState.DEAD)
                         self._schedule_auto_retry()
                         return
@@ -289,6 +301,10 @@ class DeskService(NSObject):
         self._desk = None
         if self._closing or self._suspended:
             return
+        if not constants.CONFIG_AUTO_CONNECT:
+            LOGGER.warning("Lost connection to desk; auto-connect is off")
+            self._request_state(DeskState.IDLE)
+            return
         LOGGER.warning("Lost connection to desk; reconnecting")
         self._request_state(DeskState.CONNECTING)
         asyncio.run_coroutine_threadsafe(
@@ -302,8 +318,12 @@ class DeskService(NSObject):
         """Queue a background reconnect after AUTO_RETRY_DELAY so a desk that is
         off/unreachable recovers on its own without the user intervening."""
         self._cancel_auto_retry()
-        if self._closing or self._suspended or self._loop is None:
+        if (self._closing or self._suspended or self._loop is None
+                or not constants.CONFIG_AUTO_CONNECT):
             return
+        LOGGER.info(
+            f"Will keep retrying every {constants.AUTO_RETRY_DELAY:.0f}s"
+        )
         self._retry_handle = self._loop.call_later(
             constants.AUTO_RETRY_DELAY, self._auto_retry_fire
         )
@@ -321,6 +341,8 @@ class DeskService(NSObject):
         self._retry_handle = None
         if self._closing or self._suspended:
             return
+        if not constants.CONFIG_AUTO_CONNECT:
+            return  # turned off since the retry was scheduled
         LOGGER.info("Auto-retrying desk connection")
         self._request_state(DeskState.CONNECTING)
         self._loop.create_task(self._connect())
@@ -465,6 +487,6 @@ class DeskService(NSObject):
     def systemDidWake_(self, notification):
         LOGGER.info("System woke; reconnecting to desk")
         self._suspended = False
-        self._beginConnect(
+        self._beginAutoConnect(
             "system wake", initial_delay=constants.WAKE_RECONNECT_DELAY
         )
