@@ -10,7 +10,7 @@ from ui import theme
 
 
 SETTINGS_WIDTH = 390
-SETTINGS_HEIGHT = 324
+SETTINGS_HEIGHT = 330
 
 
 class SettingsView(NSView):
@@ -34,17 +34,28 @@ class SettingsView(NSView):
     def buildUI(self):
         """Initializes and positions all UI elements within the settings window."""
         # Desk address
-        self.addSubview_(self._fieldLabel_("Desk address", 288))
-        self.uuid_field = self._textField_(262)
+        self.addSubview_(self._fieldLabel_("Desk address", 294))
+        self.uuid_field = self._textField_(268)
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.addSubview_(self.uuid_field)
 
-        # Automatic (re)connection toggle
         self.auto_connect_checkbox = self._checkbox_(
-            "Automatically connect to desk", 232, constants.CONFIG_AUTO_CONNECT
+            "Automatically connect to desk", 231, constants.CONFIG_AUTO_CONNECT,
+            width=254,
         )
         self.addSubview_(self.auto_connect_checkbox)
+
+        # Disconnect button, only enabled while a desk is connected
+        self.disconnect_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(282, 226, 88, 30)
+        )
+        self.disconnect_button.setTitle_("Disconnect")
+        self.disconnect_button.setBezelStyle_(1)
+        self.disconnect_button.setTarget_(self)
+        self.disconnect_button.setAction_("disconnect:")
+        self.addSubview_(self.disconnect_button)
+        self.refreshConnectionState()
 
         # Sit preset
         self.addSubview_(self._fieldLabel_("\"Sit\" preset height", 198))
@@ -112,9 +123,9 @@ class SettingsView(NSView):
         return field
 
     @objc.python_method
-    def _checkbox_(self, title, y, checked):
-        """Builds a full-width checkbox for a boolean preference."""
-        checkbox = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(20, y, 350, 20))
+    def _checkbox_(self, title, y, checked, width=350):
+        """Builds a checkbox for a boolean preference."""
+        checkbox = Cocoa.NSButton.alloc().initWithFrame_(NSMakeRect(20, y, width, 20))
         checkbox.setButtonType_(3)  # NSButtonTypeSwitch (checkbox)
         checkbox.setTitle_(title)
         checkbox.setFont_(theme.font(13))
@@ -152,6 +163,11 @@ class SettingsView(NSView):
         if self.window() is not None:
             self.window().makeFirstResponder_(self.uuid_field)
 
+    @objc.python_method
+    def refreshConnectionState(self):
+        """Greys out Disconnect while no desk is connected."""
+        self.disconnect_button.setEnabled_(self.app.desk.is_healthy())
+
     def sliderChanged_(self, sender):
         """Live-updates the value indicator as a preset slider is dragged."""
         if sender is self.sit_slider:
@@ -181,6 +197,11 @@ class SettingsView(NSView):
             self.app.desk.retry()
         self.app.checkAndUpdatePopover()
         self.app.refreshStatusItem()
+
+    def disconnect_(self, sender):
+        """Drops the desk connection right away, until the user connects again."""
+        LOGGER.debug("Disconnect button pressed")
+        self.app.desk.disconnect()
 
     def cancel_(self, sender):
         """Discards changes and closes the settings window."""

@@ -41,7 +41,7 @@ class ContentViews(Enum):
     CONNECTING = 1
     SLIDER = 2
     NOCON = 3
-    DISCONNECTED = 4  # not connected because auto-connect is off
+    DISCONNECTED = 4
 
 class MenuBarApp(NSObject):
     """
@@ -71,6 +71,7 @@ class MenuBarApp(NSObject):
 
             self.popover_window = None
             self.settings_window = None
+            self.settings_view = None
             self.current_content = None
             self.is_visible = False
             self.slider_view = None
@@ -164,6 +165,9 @@ class MenuBarApp(NSObject):
             required = ContentViews.DISCONNECTED
         else:
             required = ContentViews.CONNECTING
+
+        if self.settings_view is not None:
+            self.settings_view.refreshConnectionState()
 
         if required == self.current_content:
             return
@@ -341,7 +345,8 @@ class MenuBarApp(NSObject):
             self.settings_window.setFrameAutosaveName_(SETTINGS_FRAME_NAME)
             self.settings_window.setContentSize_(NSSize(SETTINGS_WIDTH, SETTINGS_HEIGHT))
 
-        self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
+        self.settings_view = SettingsView.alloc().initWithApp_(self)
+        self.settings_window.setContentView_(self.settings_view)
         Cocoa.NSApp.activateIgnoringOtherApps_(True)
         self.settings_window.makeKeyAndOrderFront_(None)
 

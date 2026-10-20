@@ -101,6 +101,16 @@ class DeskService(NSObject):
         self._beginConnect("user retry")
 
     @objc.python_method
+    def disconnect(self):
+        """User-initiated disconnect. Stays disconnected until the user connects
+        again, regardless of auto-connect."""
+        if self._closing or self._loop is None:
+            return
+        LOGGER.info("Disconnecting from desk (user request)")
+        self._applyState(DeskState.IDLE)
+        asyncio.run_coroutine_threadsafe(self._disconnect_current(), self._loop)
+
+    @objc.python_method
     def is_healthy(self):
         return self._state == DeskState.CONNECTED
 
@@ -485,8 +495,12 @@ class DeskService(NSObject):
             asyncio.run_coroutine_threadsafe(self._disconnect_current(), self._loop)
 
     def systemDidWake_(self, notification):
-        LOGGER.info("System woke; reconnecting to desk")
         self._suspended = False
+        if self.is_idle():
+            # Deliberately disconnected (by the user or with auto-connect off)
+            LOGGER.info("System woke; staying disconnected")
+            return
+        LOGGER.info("System woke; reconnecting to desk")
         self._beginAutoConnect(
             "system wake", initial_delay=constants.WAKE_RECONNECT_DELAY
         )
