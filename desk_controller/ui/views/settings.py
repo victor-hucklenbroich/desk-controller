@@ -1,6 +1,9 @@
 import Cocoa
 import objc
-from AppKit import NSView, NSColor, NSTextField, NSSlider
+from AppKit import (
+    NSView, NSColor, NSTextField, NSSlider, NSImageView,
+    NSImageScaleAxesIndependently,
+)
 from Foundation import NSObject, NSMakeRect
 
 import constants
@@ -11,6 +14,10 @@ from ui import theme
 
 SETTINGS_WIDTH = 390
 SETTINGS_HEIGHT = 330
+
+# Preset height sprite, sized to the sprite's aspect ratio
+ICON_W = 22
+ICON_H = 18
 
 
 class SettingsView(NSView):
@@ -63,6 +70,8 @@ class SettingsView(NSView):
         self.addSubview_(self.sit_slider)
         self.sit_value = self._valueLabel_(176, constants.CONFIG_SIT)
         self.addSubview_(self.sit_value)
+        self.sit_icon = self._presetIcon_(175, constants.CONFIG_SIT)
+        self.addSubview_(self.sit_icon)
 
         # Stand preset
         self.addSubview_(self._fieldLabel_("\"Stand\" preset height", 138))
@@ -70,6 +79,8 @@ class SettingsView(NSView):
         self.addSubview_(self.stand_slider)
         self.stand_value = self._valueLabel_(116, constants.CONFIG_STAND)
         self.addSubview_(self.stand_value)
+        self.stand_icon = self._presetIcon_(115, constants.CONFIG_STAND)
+        self.addSubview_(self.stand_icon)
 
         # Menu bar height readout toggle
         self.show_height_checkbox = self._checkbox_(
@@ -137,7 +148,7 @@ class SettingsView(NSView):
         """Builds a preset height slider spanning the desk's travel range,
         mirroring the main popover control. Continuous so the value indicator
         tracks the handle live while dragging."""
-        slider = NSSlider.alloc().initWithFrame_(NSMakeRect(20, y, 280, 20))
+        slider = NSSlider.alloc().initWithFrame_(NSMakeRect(20, y, 254, 20))
         slider.setMinValue_(constants.MIN_HEIGHT)
         slider.setMaxValue_(constants.MAX_HEIGHT)
         slider.setDoubleValue_(value)
@@ -150,9 +161,21 @@ class SettingsView(NSView):
     def _valueLabel_(self, y, value):
         """Builds the numeric readout shown next to a preset slider."""
         return theme.label(
-            self._formatHeight(value), NSMakeRect(312, y, 58, 16),
+            self._formatHeight(value), NSMakeRect(286, y, 58, 16),
             size=13, weight=theme.WEIGHT_SEMIBOLD, align=theme.ALIGN_RIGHT,
         )
+
+    @objc.python_method
+    def _presetIcon_(self, y, value):
+        """Builds the desk sprite shown next to a preset readout, picking the
+        same frame the menu bar icon shows at that height."""
+        icon = NSImageView.alloc().initWithFrame_(
+            NSMakeRect(370 - ICON_W, y, ICON_W, ICON_H)
+        )
+        icon.setImageScaling_(NSImageScaleAxesIndependently)
+        icon.setContentTintColor_(NSColor.secondaryLabelColor())
+        icon.setImage_(constants.icon_frame(value))
+        return icon
 
     @objc.python_method
     def _formatHeight(self, cm):
@@ -169,11 +192,15 @@ class SettingsView(NSView):
         self.disconnect_button.setEnabled_(self.app.desk.is_healthy())
 
     def sliderChanged_(self, sender):
-        """Live-updates the value indicator as a preset slider is dragged."""
+        """Live-updates the value indicator and sprite as a preset slider is dragged."""
         if sender is self.sit_slider:
-            self.sit_value.setStringValue_(self._formatHeight(sender.doubleValue()))
+            value, icon = self.sit_value, self.sit_icon
         elif sender is self.stand_slider:
-            self.stand_value.setStringValue_(self._formatHeight(sender.doubleValue()))
+            value, icon = self.stand_value, self.stand_icon
+        else:
+            return
+        value.setStringValue_(self._formatHeight(sender.doubleValue()))
+        icon.setImage_(constants.icon_frame(sender.doubleValue()))
 
     def apply_(self, sender):
         """Persists the entered preferences to config.yaml and runtime constants."""

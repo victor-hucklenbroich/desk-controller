@@ -112,6 +112,15 @@ for i in range(15):
     icon.setSize_(NSSize(ICON_SIZE, ICON_SIZE))
     icon.setTemplate_(True)
     ICON_FRAMES.append(icon)
+
+
+def icon_frame(height_cm):
+    """Returns the desk icon sprite matching a height within the travel range."""
+    last = len(ICON_FRAMES) - 1
+    normalized = (height_cm - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)
+    return ICON_FRAMES[max(0, min(last, round(normalized * last)))]
+
+
 SPINNER_FRAMES = ["◴", "◷", "◶", "◵"]
 
 MONO_FONT = NSFont.monospacedDigitSystemFontOfSize_weight_(13, 0)

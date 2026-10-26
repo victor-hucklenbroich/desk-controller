@@ -253,10 +253,7 @@ class MenuBarApp(NSObject):
     @objc.python_method
     def _deskFrame(self):
         """Returns the desk icon sprite matching the last known height."""
-        span = constants.MAX_HEIGHT - constants.MIN_HEIGHT
-        normalized = (self.current_height - constants.MIN_HEIGHT) / span
-        index = max(0, min(14, round(normalized * 14)))
-        return constants.ICON_FRAMES[index]
+        return constants.icon_frame(self.current_height)
 
     @objc.python_method
     def _updateStatusItem(self, state):

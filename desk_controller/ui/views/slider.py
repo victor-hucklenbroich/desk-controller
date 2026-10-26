@@ -148,9 +148,7 @@ class SliderView(NSView):
             status_item.button().setAttributedTitle_(attr_title)
 
         # icon sprite update
-        normalized = (height_value - constants.MIN_HEIGHT) / (constants.MAX_HEIGHT - constants.MIN_HEIGHT)
-        frame_index = max(0, min(14, round(normalized * 14)))
-        status_item.button().setImage_(constants.ICON_FRAMES[frame_index])
+        status_item.button().setImage_(constants.icon_frame(height_value))
 
         # slider update
         if move_slider_handle:
