@@ -1,7 +1,7 @@
 import Cocoa
 import objc
 from AppKit import (
-    NSView, NSColor, NSTextField, NSSlider, NSImageView,
+    NSView, NSColor, NSTextField, NSSlider, NSImageView, NSFormatter,
     NSImageScaleAxesIndependently,
 )
 from Foundation import NSObject, NSMakeRect
@@ -13,16 +13,34 @@ from ui import theme
 
 
 SETTINGS_WIDTH = 390
-SETTINGS_HEIGHT = 330
+SETTINGS_HEIGHT = 350
 
 # Preset height sprite, sized to the sprite's aspect ratio
 ICON_W = 22
 ICON_H = 18
 
+# Preset name field, inline after its caption and as wide as the popover button
+PRESET_CAPTION_W = 50
+PRESET_NAME_X = 20 + PRESET_CAPTION_W + 2
+
+
+class PresetNameFormatter(NSFormatter):
+    """Rejects edits to a preset name field that would make the name too wide
+    for its button in the popover."""
+
+    def stringForObjectValue_(self, value):
+        return value if isinstance(value, str) else ""
+
+    def getObjectValue_forString_errorDescription_(self, value, string, error):
+        return True, string, None
+
+    def isPartialStringValid_newEditingString_errorDescription_(self, partial, new, error):
+        return theme.fits_preset_button(partial), None, None
+
 
 class SettingsView(NSView):
     """
-    UI View for editing user preferences (desk UUID, sit/stand presets).
+    UI View for editing user preferences (desk UUID, presets).
     Content view of a standard titled window.
     """
 
@@ -41,21 +59,21 @@ class SettingsView(NSView):
     def buildUI(self):
         """Initializes and positions all UI elements within the settings window."""
         # Desk address
-        self.addSubview_(self._fieldLabel_("Desk address", 294))
-        self.uuid_field = self._textField_(268)
+        self.addSubview_(self._fieldLabel_("Desk address", 314))
+        self.uuid_field = self._textField_(288)
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.addSubview_(self.uuid_field)
 
         self.auto_connect_checkbox = self._checkbox_(
-            "Automatically connect to desk", 231, constants.CONFIG_AUTO_CONNECT,
+            "Automatically connect to desk", 251, constants.CONFIG_AUTO_CONNECT,
             width=254,
         )
         self.addSubview_(self.auto_connect_checkbox)
 
         # Disconnect button, only enabled while a desk is connected
         self.disconnect_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(282, 226, 88, 30)
+            NSMakeRect(282, 246, 88, 30)
         )
         self.disconnect_button.setTitle_("Disconnect")
         self.disconnect_button.setBezelStyle_(1)
@@ -64,23 +82,31 @@ class SettingsView(NSView):
         self.addSubview_(self.disconnect_button)
         self.refreshConnectionState()
 
-        # Sit preset
-        self.addSubview_(self._fieldLabel_("\"Sit\" preset height", 198))
-        self.sit_slider = self._presetSlider_(174, constants.CONFIG_SIT)
-        self.addSubview_(self.sit_slider)
-        self.sit_value = self._valueLabel_(176, constants.CONFIG_SIT)
-        self.addSubview_(self.sit_value)
-        self.sit_icon = self._presetIcon_(175, constants.CONFIG_SIT)
-        self.addSubview_(self.sit_icon)
+        # Preset 1
+        self.addSubview_(self._fieldLabel_("Preset:", 214, width=PRESET_CAPTION_W))
+        self.preset_1_name = self._presetNameField_(
+            210, constants.CONFIG_PRESET_1_NAME, constants.DEFAULT_PRESET_1_NAME
+        )
+        self.addSubview_(self.preset_1_name)
+        self.preset_1_slider = self._presetSlider_(184, constants.CONFIG_PRESET_1)
+        self.addSubview_(self.preset_1_slider)
+        self.preset_1_value = self._valueLabel_(186, constants.CONFIG_PRESET_1)
+        self.addSubview_(self.preset_1_value)
+        self.preset_1_icon = self._presetIcon_(185, constants.CONFIG_PRESET_1)
+        self.addSubview_(self.preset_1_icon)
 
-        # Stand preset
-        self.addSubview_(self._fieldLabel_("\"Stand\" preset height", 138))
-        self.stand_slider = self._presetSlider_(114, constants.CONFIG_STAND)
-        self.addSubview_(self.stand_slider)
-        self.stand_value = self._valueLabel_(116, constants.CONFIG_STAND)
-        self.addSubview_(self.stand_value)
-        self.stand_icon = self._presetIcon_(115, constants.CONFIG_STAND)
-        self.addSubview_(self.stand_icon)
+        # Preset 2
+        self.addSubview_(self._fieldLabel_("Preset:", 144, width=PRESET_CAPTION_W))
+        self.preset_2_name = self._presetNameField_(
+            140, constants.CONFIG_PRESET_2_NAME, constants.DEFAULT_PRESET_2_NAME
+        )
+        self.addSubview_(self.preset_2_name)
+        self.preset_2_slider = self._presetSlider_(114, constants.CONFIG_PRESET_2)
+        self.addSubview_(self.preset_2_slider)
+        self.preset_2_value = self._valueLabel_(116, constants.CONFIG_PRESET_2)
+        self.addSubview_(self.preset_2_value)
+        self.preset_2_icon = self._presetIcon_(115, constants.CONFIG_PRESET_2)
+        self.addSubview_(self.preset_2_icon)
 
         # Menu bar height readout toggle
         self.show_height_checkbox = self._checkbox_(
@@ -113,24 +139,37 @@ class SettingsView(NSView):
         self.addSubview_(apply_button)
 
     @objc.python_method
-    def _fieldLabel_(self, text, y):
+    def _fieldLabel_(self, text, y, width=350):
         """Builds a dimmed caption label positioned above a text field."""
         return theme.label(
-            text, NSMakeRect(20, y, 350, 16),
+            text, NSMakeRect(20, y, width, 16),
             size=12, color=NSColor.secondaryLabelColor(),
         )
 
     @objc.python_method
-    def _textField_(self, y):
+    def _textField_(self, y, x=20, width=350):
         """Builds an editable text field. The text colour is left at its
         default so the field tracks light/dark appearance."""
-        field = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y, 350, 24))
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, width, 24))
         field.setBezeled_(True)
         field.setDrawsBackground_(True)
         field.setEditable_(True)
         field.setSelectable_(True)
         field.setFont_(theme.font(13))
         field.setAlignment_(theme.ALIGN_LEFT)
+        return field
+
+    @objc.python_method
+    def _presetNameField_(self, y, name, default):
+        """Builds the name field of a preset, limited to names that fit on its
+        popover button. A name already too wide (e.g. hand-edited in the
+        config) is shortened first, so the field can still be edited."""
+        field = self._textField_(y, x=PRESET_NAME_X, width=theme.PRESET_BUTTON_WIDTH)
+        field.setPlaceholderString_(default)
+        field.setFormatter_(PresetNameFormatter.alloc().init())
+        while not theme.fits_preset_button(name):
+            name = name[:-1]
+        field.setStringValue_(name)
         return field
 
     @objc.python_method
@@ -193,10 +232,10 @@ class SettingsView(NSView):
 
     def sliderChanged_(self, sender):
         """Live-updates the value indicator and sprite as a preset slider is dragged."""
-        if sender is self.sit_slider:
-            value, icon = self.sit_value, self.sit_icon
-        elif sender is self.stand_slider:
-            value, icon = self.stand_value, self.stand_icon
+        if sender is self.preset_1_slider:
+            value, icon = self.preset_1_value, self.preset_1_icon
+        elif sender is self.preset_2_slider:
+            value, icon = self.preset_2_value, self.preset_2_icon
         else:
             return
         value.setStringValue_(self._formatHeight(sender.doubleValue()))
@@ -205,18 +244,25 @@ class SettingsView(NSView):
     def apply_(self, sender):
         """Persists the entered preferences to config.yaml and runtime constants."""
         uuid = self.uuid_field.stringValue().strip()
-        sit = int(round(self.sit_slider.doubleValue()))
-        stand = int(round(self.stand_slider.doubleValue()))
+        preset_1 = int(round(self.preset_1_slider.doubleValue()))
+        preset_2 = int(round(self.preset_2_slider.doubleValue()))
+        preset_1_name = self.preset_1_name.stringValue()
+        preset_2_name = self.preset_2_name.stringValue()
         show_height = self.show_height_checkbox.state() == 1
         auto_connect = self.auto_connect_checkbox.state() == 1
 
         uuid_changed = uuid != "" and uuid != constants.CONFIG_UUID
         auto_connect_enabled = auto_connect and not constants.CONFIG_AUTO_CONNECT
         LOGGER.info(
-            f"Saving settings (uuid_changed={uuid_changed}, sit={sit}, "
-            f"stand={stand}, show_height={show_height}, auto_connect={auto_connect})"
+            f"Saving settings (uuid_changed={uuid_changed}, "
+            f"preset_1={preset_1_name!r}@{preset_1}, preset_2={preset_2_name!r}@{preset_2}, "
+            f"show_height={show_height}, auto_connect={auto_connect})"
         )
-        config.ConfigParser.update(uuid, sit, stand, show_height, auto_connect)
+        config.ConfigParser.update(
+            uuid, preset_1=preset_1, preset_2=preset_2,
+            preset_1_name=preset_1_name, preset_2_name=preset_2_name,
+            show_height=show_height, auto_connect=auto_connect,
+        )
 
         self.app.closeSettings()
 
