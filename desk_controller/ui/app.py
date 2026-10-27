@@ -41,6 +41,7 @@ class ContentViews(Enum):
     CONNECTING = 1
     SLIDER = 2
     NOCON = 3
+    DISCONNECTED = 4
 
 class MenuBarApp(NSObject):
     """
@@ -70,6 +71,7 @@ class MenuBarApp(NSObject):
 
             self.popover_window = None
             self.settings_window = None
+            self.settings_view = None
             self.current_content = None
             self.is_visible = False
             self.slider_view = None
@@ -159,8 +161,13 @@ class MenuBarApp(NSObject):
             required = ContentViews.NOCON
         elif self.desk.is_healthy():
             required = ContentViews.SLIDER
+        elif self.desk.is_idle():
+            required = ContentViews.DISCONNECTED
         else:
             required = ContentViews.CONNECTING
+
+        if self.settings_view is not None:
+            self.settings_view.refreshConnectionState()
 
         if required == self.current_content:
             return
@@ -178,7 +185,7 @@ class MenuBarApp(NSObject):
         self.slider_view = None
         if state == ContentViews.SETUP:
             content_view = InitialSetupView.alloc().initWithApp_(self)
-        elif state == ContentViews.NOCON:
+        elif state in (ContentViews.NOCON, ContentViews.DISCONNECTED):
             content_view = NoConnectionView.alloc().initWithApp_(self)
         elif state == ContentViews.SLIDER:
             content_view = SliderView.alloc().initWithApp_(self)
@@ -246,10 +253,7 @@ class MenuBarApp(NSObject):
     @objc.python_method
     def _deskFrame(self):
         """Returns the desk icon sprite matching the last known height."""
-        span = constants.MAX_HEIGHT - constants.MIN_HEIGHT
-        normalized = (self.current_height - constants.MIN_HEIGHT) / span
-        index = max(0, min(14, round(normalized * 14)))
-        return constants.ICON_FRAMES[index]
+        return constants.icon_frame(self.current_height)
 
     @objc.python_method
     def _updateStatusItem(self, state):
@@ -257,6 +261,7 @@ class MenuBarApp(NSObject):
         button = self.status_item.button()
         button.setImage_(self._deskFrame())
         button.setImagePosition_(3)
+        button.setAppearsDisabled_(state == ContentViews.DISCONNECTED)
 
         if state == ContentViews.CONNECTING:
             self._startStatusSpinner()
@@ -269,7 +274,7 @@ class MenuBarApp(NSObject):
                     "⚠︎ ", {NSFontAttributeName: constants.MONO_FONT}
                 )
             )
-        elif state == ContentViews.SETUP:
+        elif state in (ContentViews.SETUP, ContentViews.DISCONNECTED):
             button.setImagePosition_(1)
             button.setAttributedTitle_(NSAttributedString.alloc().initWithString_(""))
         else: # SLIDER
@@ -337,7 +342,8 @@ class MenuBarApp(NSObject):
             self.settings_window.setFrameAutosaveName_(SETTINGS_FRAME_NAME)
             self.settings_window.setContentSize_(NSSize(SETTINGS_WIDTH, SETTINGS_HEIGHT))
 
-        self.settings_window.setContentView_(SettingsView.alloc().initWithApp_(self))
+        self.settings_view = SettingsView.alloc().initWithApp_(self)
+        self.settings_window.setContentView_(self.settings_view)
         Cocoa.NSApp.activateIgnoringOtherApps_(True)
         self.settings_window.makeKeyAndOrderFront_(None)
 

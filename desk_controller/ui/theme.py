@@ -7,7 +7,7 @@ the light/dark appearance and picks up vibrancy on top of the Liquid Glass
 background instead of the old hard-coded whites.
 """
 
-from AppKit import NSColor, NSFont, NSTextField
+from AppKit import NSButton, NSButtonCell, NSColor, NSFont, NSTextField
 from Foundation import NSMakeRect
 
 
@@ -17,10 +17,19 @@ POPOVER_HEIGHT = 164
 POPOVER_RADIUS = 22.0
 PAD = 18
 
+# Preset buttons, side by side beneath the popover slider
+PRESET_BUTTON_GAP = 12
+PRESET_BUTTON_WIDTH = (POPOVER_WIDTH - 2 * PAD - PRESET_BUTTON_GAP) / 2
+PRESET_BUTTON_HEIGHT = 34
+PRESET_BEZEL = 2  # NSBezelStyleRegularSquare
+
 # Text alignment
 ALIGN_LEFT = 0
 ALIGN_CENTER = 1
 ALIGN_RIGHT = 2
+
+# Line break modes
+LINE_BREAK_TRUNCATE_TAIL = 4
 
 # Font weights
 WEIGHT_REGULAR = 0.0
@@ -52,3 +61,21 @@ def label(text, frame, size=13, color=None, weight=None, align=ALIGN_LEFT):
     field.setTextColor_(color if color is not None else NSColor.labelColor())
     field.setAlignment_(align)
     return field
+
+
+def preset_button(title, frame):
+    """Builds a popover preset button. A title too wide for it (e.g. from a
+    hand-edited config) is cut off with an ellipsis instead of wrapping."""
+    button = NSButton.alloc().initWithFrame_(frame)
+    button.setTitle_(title)
+    button.setBezelStyle_(PRESET_BEZEL)
+    button.cell().setLineBreakMode_(LINE_BREAK_TRUNCATE_TAIL)
+    return button
+
+
+def fits_preset_button(title):
+    """Whether ``title`` fits on a preset button without being cut off,
+    measured with the same cell, so font and bezel padding match."""
+    cell = NSButtonCell.alloc().initTextCell_(title)
+    cell.setBezelStyle_(PRESET_BEZEL)
+    return cell.cellSize().width <= PRESET_BUTTON_WIDTH

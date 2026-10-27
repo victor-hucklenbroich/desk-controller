@@ -12,7 +12,8 @@ from ui import theme
 
 class NoConnectionView(NSView):
     """
-    UI View shown when the desk connection could not be established.
+    UI View shown when the desk connection could not be established, or when
+    it isn't connected because auto-connect is turned off.
     """
 
     def initWithApp_(self, app):
@@ -33,6 +34,7 @@ class NoConnectionView(NSView):
         width = theme.POPOVER_WIDTH
         height = theme.POPOVER_HEIGHT
         inner = width - 2 * pad
+        failed = self.app.desk.is_dead()
 
         # Controls: settings and quit
         self.addSubview_(window.make_settings_button(
@@ -44,7 +46,8 @@ class NoConnectionView(NSView):
 
         # Header
         self.addSubview_(theme.label(
-            "Couldn't connect to your desk", NSMakeRect(pad, 128, inner - 70, 22),
+            "Couldn't connect to your desk" if failed else "Not connected to your desk",
+            NSMakeRect(pad, 128, inner - 70, 22),
             size=16, weight=theme.WEIGHT_SEMIBOLD,
         ))
         self.addSubview_(theme.label(
@@ -68,11 +71,11 @@ class NoConnectionView(NSView):
         self.uuid_field.setAlignment_(theme.ALIGN_CENTER)
         self.addSubview_(self.uuid_field)
 
-        # Try again button (primary, default action)
+        # Try again / connect button (primary, default action)
         retry_button = Cocoa.NSButton.alloc().initWithFrame_(
             NSMakeRect((width - 120) / 2, 18, 120, 30)
         )
-        retry_button.setTitle_("Try Again")
+        retry_button.setTitle_("Try Again" if failed else "Connect")
         retry_button.setBezelStyle_(1)
         retry_button.setKeyEquivalent_("\r")
         retry_button.setTarget_(self)

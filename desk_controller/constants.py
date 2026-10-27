@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import unicodedata
 
 import yaml
 
@@ -35,8 +36,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 # --- Static Constants ---
-VERSION: str = "v1.4.0"
+VERSION: str = "v1.4.1"
 PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
+MOCK_ADDRESS: str = "dev"
 
 # --- Desk height limits (cm, floats for mm precision) ---
 # Defaults match a typical Idasen (620-1270mm) and are refined per desk
@@ -53,11 +55,18 @@ AUTO_RETRY_DELAY: float = 360.0 # seconds
 
 
 # --- Preference constants ---
+DEFAULT_PRESET_1_NAME: str = "Sit"
+DEFAULT_PRESET_2_NAME: str = "Stand"
+
 DEFAULT_CONFIG: dict = {
     "mac_address": PLACEHOLDER_UUID,
-    "presets": {"sit": 750, "stand": 1240},
+    "presets": {
+        "preset_1": {"name": DEFAULT_PRESET_1_NAME, "height": 750},
+        "preset_2": {"name": DEFAULT_PRESET_2_NAME, "height": 1240},
+    },
     "max_height": 1270,
     "show_height": True,
+    "auto_connect": True,
 }
 
 if not os.path.exists(CONFIG_FILE_PATH):
@@ -73,13 +82,36 @@ except (OSError, yaml.YAMLError) as e:
     LOGGER.warning(f"Error reading config.yaml: {e}")
     CONFIG = {}
 
+
+def preset_name(name, default):
+    """Flattens a preset name to a single line without control characters,
+    falling back to the default when nothing is left."""
+    if name is None:
+        return default
+    name = " ".join(str(name).split())
+    name = "".join(c for c in name if unicodedata.category(c) != "Cc")
+    return name or default
+
+
+def _preset(key, legacy_key, default_height, default_name):
+    """Reads a preset as (height in cm, name). Configs from before presets
+    could be renamed keyed the heights by "sit"/"stand", so those still count."""
+    preset = _presets.get(key)
+    if not isinstance(preset, dict):
+        preset = {}
+    height = int(preset.get("height", _presets.get(legacy_key, default_height)))
+    return int(height / 10), preset_name(preset.get("name"), default_name)
+
+
 _presets = CONFIG.get("presets") or {}
 CONFIG_UUID: str = str(CONFIG.get("mac_address", PLACEHOLDER_UUID))
-CONFIG_SIT: int = int(int(_presets.get("sit", 750)) / 10)
-CONFIG_STAND: int = int(int(_presets.get("stand", 1240)) / 10)
+CONFIG_PRESET_1, CONFIG_PRESET_1_NAME = _preset("preset_1", "sit", 750, DEFAULT_PRESET_1_NAME)
+CONFIG_PRESET_2, CONFIG_PRESET_2_NAME = _preset("preset_2", "stand", 1240, DEFAULT_PRESET_2_NAME)
 
 # Whether the current desk height is shown next to the menu bar icon.
 CONFIG_SHOW_HEIGHT: bool = bool(CONFIG.get("show_height", True))
+
+CONFIG_AUTO_CONNECT: bool = bool(CONFIG.get("auto_connect", True))
 
 # Height of the tabletop above ground at the lowest position (mm);
 # read from the desk controller during connect when unset.
@@ -108,6 +140,15 @@ for i in range(15):
     icon.setSize_(NSSize(ICON_SIZE, ICON_SIZE))
     icon.setTemplate_(True)
     ICON_FRAMES.append(icon)
+
+
+def icon_frame(height_cm):
+    """Returns the desk icon sprite matching a height within the travel range."""
+    last = len(ICON_FRAMES) - 1
+    normalized = (height_cm - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)
+    return ICON_FRAMES[max(0, min(last, round(normalized * last)))]
+
+
 SPINNER_FRAMES = ["◴", "◷", "◶", "◵"]
 
 MONO_FONT = NSFont.monospacedDigitSystemFontOfSize_weight_(13, 0)

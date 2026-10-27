@@ -12,6 +12,7 @@ import constants
 from constants import LOGGER
 from control.config import ConfigParser
 from control.linak.desk import Desk
+from control.linak.mock import MockDeskClient
 from control.linak.util import Height
 
 
@@ -71,7 +72,7 @@ class DeskService(NSObject):
         )
         self._thread.start()
         self._registerWorkspaceObservers()
-        self._beginConnect("initial start")
+        self._beginAutoConnect("initial start")
 
     @objc.python_method
     def stop(self):
@@ -95,8 +96,19 @@ class DeskService(NSObject):
 
     @objc.python_method
     def retry(self):
-        """User-initiated (re)connect: after setup, a UUID change, or DEAD."""
+        """User-initiated (re)connect: after setup, a UUID change, DEAD, or
+        while auto-connect is off."""
         self._beginConnect("user retry")
+
+    @objc.python_method
+    def disconnect(self):
+        """User-initiated disconnect. Stays disconnected until the user connects
+        again, regardless of auto-connect."""
+        if self._closing or self._loop is None:
+            return
+        LOGGER.info("Disconnecting from desk (user request)")
+        self._applyState(DeskState.IDLE)
+        asyncio.run_coroutine_threadsafe(self._disconnect_current(), self._loop)
 
     @objc.python_method
     def is_healthy(self):
@@ -105,6 +117,10 @@ class DeskService(NSObject):
     @objc.python_method
     def is_dead(self):
         return self._state == DeskState.DEAD
+
+    @objc.python_method
+    def is_idle(self):
+        return self._state == DeskState.IDLE
 
     @objc.python_method
     def move_to_cm(self, target_cm, on_done=None):
@@ -165,6 +181,16 @@ class DeskService(NSObject):
         )
 
     @objc.python_method
+    def _beginAutoConnect(self, reason, initial_delay=0.0):
+        """Connect without the user asking (launch, wake), unless auto-connect
+        is turned off. Main thread only."""
+        if not constants.CONFIG_AUTO_CONNECT:
+            LOGGER.info(f"Auto-connect is off; not connecting ({reason})")
+            self._applyState(DeskState.IDLE)
+            return
+        self._beginConnect(reason, initial_delay)
+
+    @objc.python_method
     async def _recycle_and_connect(self, initial_delay=0.0):
         self._cancel_auto_retry()
         await self._disconnect_current()
@@ -185,7 +211,11 @@ class DeskService(NSObject):
                 if uuid == constants.PLACEHOLDER_UUID:
                     self._request_state(DeskState.IDLE)
                     return
-                client = BleakClient(
+                client_cls = (
+                    MockDeskClient if uuid.strip().lower() == constants.MOCK_ADDRESS
+                    else BleakClient
+                )
+                client = client_cls(
                     uuid, disconnected_callback=self._on_ble_disconnected
                 )
                 try:
@@ -215,10 +245,7 @@ class DeskService(NSObject):
                     await self._safe_disconnect(client)
                     failures += 1
                     if failures >= constants.MAX_RECONNECT_FAILURES:
-                        LOGGER.error(
-                            "Desk unreachable after retries; will keep retrying "
-                            f"every {constants.AUTO_RETRY_DELAY:.0f}s"
-                        )
+                        LOGGER.error("Desk unreachable after retries")
                         self._request_state(DeskState.DEAD)
                         self._schedule_auto_retry()
                         return
@@ -284,6 +311,10 @@ class DeskService(NSObject):
         self._desk = None
         if self._closing or self._suspended:
             return
+        if not constants.CONFIG_AUTO_CONNECT:
+            LOGGER.warning("Lost connection to desk; auto-connect is off")
+            self._request_state(DeskState.IDLE)
+            return
         LOGGER.warning("Lost connection to desk; reconnecting")
         self._request_state(DeskState.CONNECTING)
         asyncio.run_coroutine_threadsafe(
@@ -297,8 +328,12 @@ class DeskService(NSObject):
         """Queue a background reconnect after AUTO_RETRY_DELAY so a desk that is
         off/unreachable recovers on its own without the user intervening."""
         self._cancel_auto_retry()
-        if self._closing or self._suspended or self._loop is None:
+        if (self._closing or self._suspended or self._loop is None
+                or not constants.CONFIG_AUTO_CONNECT):
             return
+        LOGGER.info(
+            f"Will keep retrying every {constants.AUTO_RETRY_DELAY:.0f}s"
+        )
         self._retry_handle = self._loop.call_later(
             constants.AUTO_RETRY_DELAY, self._auto_retry_fire
         )
@@ -316,6 +351,8 @@ class DeskService(NSObject):
         self._retry_handle = None
         if self._closing or self._suspended:
             return
+        if not constants.CONFIG_AUTO_CONNECT:
+            return  # turned off since the retry was scheduled
         LOGGER.info("Auto-retrying desk connection")
         self._request_state(DeskState.CONNECTING)
         self._loop.create_task(self._connect())
@@ -458,8 +495,12 @@ class DeskService(NSObject):
             asyncio.run_coroutine_threadsafe(self._disconnect_current(), self._loop)
 
     def systemDidWake_(self, notification):
-        LOGGER.info("System woke; reconnecting to desk")
         self._suspended = False
-        self._beginConnect(
+        if self.is_idle():
+            # Deliberately disconnected (by the user or with auto-connect off)
+            LOGGER.info("System woke; staying disconnected")
+            return
+        LOGGER.info("System woke; reconnecting to desk")
+        self._beginAutoConnect(
             "system wake", initial_delay=constants.WAKE_RECONNECT_DELAY
         )

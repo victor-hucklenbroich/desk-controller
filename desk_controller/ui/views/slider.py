@@ -1,4 +1,3 @@
-import Cocoa
 import objc
 from AppKit import (
     NSView, NSSlider, NSSliderCell, NSColor,
@@ -101,26 +100,23 @@ class SliderView(NSView):
         )
         self.addSubview_(self.max_label)
 
-        # Sit / Stand preset buttons
-        gap = 12
-        button_w = (inner - gap) / 2
-        self.sit_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(pad, 18, button_w, 34)
+        # Preset buttons
+        button_w = theme.PRESET_BUTTON_WIDTH
+        button_h = theme.PRESET_BUTTON_HEIGHT
+        self.preset_1_button = theme.preset_button(
+            constants.CONFIG_PRESET_1_NAME, NSMakeRect(pad, 18, button_w, button_h)
         )
-        self.sit_button.setTitle_("Sit")
-        self.sit_button.setBezelStyle_(2)
-        self.sit_button.setTarget_(self)
-        self.sit_button.setAction_("shortcutSit:")
-        self.addSubview_(self.sit_button)
+        self.preset_1_button.setTarget_(self)
+        self.preset_1_button.setAction_("shortcutPreset1:")
+        self.addSubview_(self.preset_1_button)
 
-        self.stand_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(pad + button_w + gap, 18, button_w, 34)
+        self.preset_2_button = theme.preset_button(
+            constants.CONFIG_PRESET_2_NAME,
+            NSMakeRect(pad + button_w + theme.PRESET_BUTTON_GAP, 18, button_w, button_h),
         )
-        self.stand_button.setTitle_("Stand")
-        self.stand_button.setBezelStyle_(2)
-        self.stand_button.setTarget_(self)
-        self.stand_button.setAction_("shortcutStand:")
-        self.addSubview_(self.stand_button)
+        self.preset_2_button.setTarget_(self)
+        self.preset_2_button.setAction_("shortcutPreset2:")
+        self.addSubview_(self.preset_2_button)
 
     @objc.python_method
     def _formatHeight(self, cm):
@@ -148,9 +144,7 @@ class SliderView(NSView):
             status_item.button().setAttributedTitle_(attr_title)
 
         # icon sprite update
-        normalized = (height_value - constants.MIN_HEIGHT) / (constants.MAX_HEIGHT - constants.MIN_HEIGHT)
-        frame_index = max(0, min(14, round(normalized * 14)))
-        status_item.button().setImage_(constants.ICON_FRAMES[frame_index])
+        status_item.button().setImage_(constants.icon_frame(height_value))
 
         # slider update
         if move_slider_handle:
@@ -159,8 +153,8 @@ class SliderView(NSView):
     def setUIState_(self, enabled):
         """Enables or disables UI elements to prevent user input during transitions."""
         self.slider.setEnabled_(enabled)
-        self.sit_button.setEnabled_(enabled)
-        self.stand_button.setEnabled_(enabled)
+        self.preset_1_button.setEnabled_(enabled)
+        self.preset_2_button.setEnabled_(enabled)
 
     @objc.python_method
     def updateLimits(self):
@@ -180,15 +174,15 @@ class SliderView(NSView):
         # The user placed the handle at the target already; don't drag it along.
         self.app.beginMove(target, False)
 
-    def shortcutSit_(self, sender):
-        """Action for Sit button."""
-        LOGGER.debug("Sit shortcut button pressed")
-        self.app.beginMove(constants.CONFIG_SIT, True)
+    def shortcutPreset1_(self, sender):
+        """Action for the first preset button."""
+        LOGGER.debug("Preset 1 shortcut button pressed")
+        self.app.beginMove(constants.CONFIG_PRESET_1, True)
 
-    def shortcutStand_(self, sender):
-        """Action for Stand button."""
-        LOGGER.debug("Stand shortcut button pressed")
-        self.app.beginMove(constants.CONFIG_STAND, True)
+    def shortcutPreset2_(self, sender):
+        """Action for the second preset button."""
+        LOGGER.debug("Preset 2 shortcut button pressed")
+        self.app.beginMove(constants.CONFIG_PRESET_2, True)
 
     def quitApp_(self, sender):
         """Shuts down the desk connection and exits the application."""
