@@ -21,7 +21,7 @@ if [ -x "$DC_VENV/bin/pyinstaller" ]; then
 fi
 
 dc_app_version() {
-  python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('$DC_REPO_ROOT/desk_controller/constants.py').read_text()).group(1))"
+  python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('$DC_REPO_ROOT/src/constants.py').read_text()).group(1))"
 }
 
 # Release-only: fail early if the interpreter can't produce a universal2 bundle.

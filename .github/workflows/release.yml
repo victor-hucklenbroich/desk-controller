@@ -26,9 +26,9 @@ jobs:
 
       - name: Read app version and check it matches the tag
         run: |
-          VERSION="$(python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('desk_controller/constants.py').read_text()).group(1))")"
+          VERSION="$(python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('src/constants.py').read_text()).group(1))")"
           if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match VERSION v$VERSION in desk_controller/constants.py" >&2
+            echo "Tag $GITHUB_REF_NAME does not match VERSION v$VERSION in src/constants.py" >&2
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
