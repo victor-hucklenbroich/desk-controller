@@ -14,8 +14,8 @@ DIST_PATH="$DC_REPO_ROOT/dist/$APP_NAME"
 SPEC_FILE="$DC_REPO_ROOT/app.spec"
 ENTITLEMENTS="$DC_PACKAGING_DIR/entitlements.plist"
 
-# Prefer the dedicated universal2 build venv's tools when it is present.
-DC_VENV="${DC_VENV:-$DC_REPO_ROOT/.venv-build}"
+# Prefer the project venv's tools (created by `uv sync`) when it is present.
+DC_VENV="${DC_VENV:-$DC_REPO_ROOT/.venv}"
 if [ -x "$DC_VENV/bin/pyinstaller" ]; then
   PATH="$DC_VENV/bin:$PATH"
 fi
@@ -33,7 +33,8 @@ dc_require_universal2_toolchain() {
     *)
       echo "The build interpreter is '$platform', not universal2:" >&2
       echo "  $(command -v python3)" >&2
-      echo "Create the universal2 build venv first (see README)." >&2
+      echo "Recreate the venv from a universal2 Python, e.g. the python.org installer:" >&2
+      echo "  uv sync --python /Library/Frameworks/Python.framework/Versions/3.13/bin/python3" >&2
       exit 1
       ;;
   esac
@@ -41,7 +42,7 @@ dc_require_universal2_toolchain() {
   if python3 -c 'import sys, yaml; sys.exit(0 if yaml.__with_libyaml__ else 1)'; then
     echo "PyYAML in $(command -v python3) was installed with the libyaml extension," >&2
     echo "which is single-arch and breaks the universal2 build. Reinstall it as pure Python:" >&2
-    echo "  PYYAML_FORCE_LIBYAML=0 pip install --no-binary PyYAML --force-reinstall --no-cache-dir --no-deps PyYAML" >&2
+    echo "  PYYAML_FORCE_LIBYAML=0 uv sync --reinstall-package pyyaml --no-cache" >&2
     exit 1
   fi
 }

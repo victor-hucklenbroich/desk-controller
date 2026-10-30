@@ -26,7 +26,9 @@ jobs:
 
       - name: Read app version and check it matches the tag
         run: |
-          VERSION="$(python3 -c "import re,pathlib;print(re.search(r'VERSION:\s*str\s*=\s*\"v?([0-9.]+)\"', pathlib.Path('src/constants.py').read_text()).group(1))")"
+          # The app version resolved from src/constants.py; pyproject.toml only has a placeholder
+          source packaging/build_common.sh
+          VERSION="$(dc_app_version)"
           if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
             echo "Tag $GITHUB_REF_NAME does not match VERSION v$VERSION in src/constants.py" >&2
             exit 1
@@ -37,10 +39,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - uses: astral-sh/setup-uv@v7
+
       - name: Install build dependencies
         env:
           PYYAML_FORCE_LIBYAML: "0"
-        run: pip install --no-binary PyYAML pyinstaller -r requirements.txt
+        # setup-python's interpreter is universal2; uv's own Pythons are single-arch
+        run: uv sync --locked --python "$(command -v python3)"
 
       - name: Import Developer ID certificate into a temporary keychain
         env:
