@@ -13,7 +13,11 @@ from ui import theme
 
 
 SETTINGS_WIDTH = 390
-SETTINGS_HEIGHT = 350
+SETTINGS_HEIGHT = 372
+
+MARGIN = 20
+SECTION_GAP = 32
+ROW_GAP = 16
 
 # Preset height sprite, sized to the sprite's aspect ratio
 ICON_W = 22
@@ -57,23 +61,37 @@ class SettingsView(NSView):
         return self
 
     def buildUI(self):
-        """Initializes and positions all UI elements within the settings window."""
-        # Desk address
-        self.addSubview_(self._fieldLabel_("Desk address", 314))
-        self.uuid_field = self._textField_(288)
+        """Initializes and positions all UI elements within the settings window.
+        Categories are stacked top-down, each returning its bottom edge so the
+        next one starts SECTION_GAP below it."""
+        top = SETTINGS_HEIGHT - MARGIN
+        top = self._buildConnectionSection_(top) - SECTION_GAP
+        top = self._buildPresetSection_(top) - SECTION_GAP
+        self._buildMenuBarSection_(top)
+        self._buildFooter()
+
+    @objc.python_method
+    def _buildConnectionSection_(self, top):
+        """Desk address, auto-connect and Disconnect. Returns the bottom edge."""
+        label_y = top - 16
+        self.addSubview_(self._fieldLabel_("Desk address", label_y))
+        field_y = label_y - 2 - 24
+        self.uuid_field = self._textField_(field_y)
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.addSubview_(self.uuid_field)
 
+        # Disconnect button, only enabled while a desk is connected, with the
+        # auto-connect checkbox vertically centred beside it
+        button_y = field_y - 12 - 30
         self.auto_connect_checkbox = self._checkbox_(
-            "Automatically connect to desk", 251, constants.CONFIG_AUTO_CONNECT,
-            width=254,
+            "Automatically connect to desk", button_y + 5,
+            constants.CONFIG_AUTO_CONNECT, width=254,
         )
         self.addSubview_(self.auto_connect_checkbox)
 
-        # Disconnect button, only enabled while a desk is connected
         self.disconnect_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect(282, 246, 88, 30)
+            NSMakeRect(282, button_y, 88, 30)
         )
         self.disconnect_button.setTitle_("Disconnect")
         self.disconnect_button.setBezelStyle_(1)
@@ -81,39 +99,55 @@ class SettingsView(NSView):
         self.disconnect_button.setAction_("disconnect:")
         self.addSubview_(self.disconnect_button)
         self.refreshConnectionState()
+        return button_y
 
-        # Preset 1
-        self.addSubview_(self._fieldLabel_("Preset:", 214, width=PRESET_CAPTION_W))
-        self.preset_1_name = self._presetNameField_(
-            210, constants.CONFIG_PRESET_1_NAME, constants.DEFAULT_PRESET_1_NAME
+    @objc.python_method
+    def _buildPresetSection_(self, top):
+        """Name and height of both presets. Returns the bottom edge."""
+        (self.preset_1_name, self.preset_1_slider,
+         self.preset_1_value, self.preset_1_icon) = self._addPreset_(
+            top, constants.CONFIG_PRESET_1_NAME, constants.DEFAULT_PRESET_1_NAME,
+            constants.CONFIG_PRESET_1,
         )
-        self.addSubview_(self.preset_1_name)
-        self.preset_1_slider = self._presetSlider_(184, constants.CONFIG_PRESET_1)
-        self.addSubview_(self.preset_1_slider)
-        self.preset_1_value = self._valueLabel_(186, constants.CONFIG_PRESET_1)
-        self.addSubview_(self.preset_1_value)
-        self.preset_1_icon = self._presetIcon_(185, constants.CONFIG_PRESET_1)
-        self.addSubview_(self.preset_1_icon)
-
-        # Preset 2
-        self.addSubview_(self._fieldLabel_("Preset:", 144, width=PRESET_CAPTION_W))
-        self.preset_2_name = self._presetNameField_(
-            140, constants.CONFIG_PRESET_2_NAME, constants.DEFAULT_PRESET_2_NAME
+        top = self.preset_1_slider.frame().origin.y - ROW_GAP
+        (self.preset_2_name, self.preset_2_slider,
+         self.preset_2_value, self.preset_2_icon) = self._addPreset_(
+            top, constants.CONFIG_PRESET_2_NAME, constants.DEFAULT_PRESET_2_NAME,
+            constants.CONFIG_PRESET_2,
         )
-        self.addSubview_(self.preset_2_name)
-        self.preset_2_slider = self._presetSlider_(114, constants.CONFIG_PRESET_2)
-        self.addSubview_(self.preset_2_slider)
-        self.preset_2_value = self._valueLabel_(116, constants.CONFIG_PRESET_2)
-        self.addSubview_(self.preset_2_value)
-        self.preset_2_icon = self._presetIcon_(115, constants.CONFIG_PRESET_2)
-        self.addSubview_(self.preset_2_icon)
+        return self.preset_2_slider.frame().origin.y
 
-        # Menu bar height readout toggle
+    @objc.python_method
+    def _addPreset_(self, top, name, default, value):
+        """Adds one preset below ``top``: a caption with the name field inline,
+        then the height slider with its readout and desk sprite."""
+        name_y = top - 24
+        self.addSubview_(self._fieldLabel_("Preset:", name_y + 4, width=PRESET_CAPTION_W))
+        name_field = self._presetNameField_(name_y, name, default)
+        self.addSubview_(name_field)
+
+        slider_y = name_y - 6 - 20
+        slider = self._presetSlider_(slider_y, value)
+        self.addSubview_(slider)
+        value_label = self._valueLabel_(slider_y + 2, value)
+        self.addSubview_(value_label)
+        icon = self._presetIcon_(slider_y + 1, value)
+        self.addSubview_(icon)
+        return name_field, slider, value_label, icon
+
+    @objc.python_method
+    def _buildMenuBarSection_(self, top):
+        """Menu bar height readout toggle. Returns the bottom edge."""
+        checkbox_y = top - 20
         self.show_height_checkbox = self._checkbox_(
-            "Show desk height in menu bar", 72, constants.CONFIG_SHOW_HEIGHT
+            "Show desk height in menu bar", checkbox_y, constants.CONFIG_SHOW_HEIGHT
         )
         self.addSubview_(self.show_height_checkbox)
+        return checkbox_y
 
+    @objc.python_method
+    def _buildFooter(self):
+        """Version label with Cancel and Apply, pinned to the bottom edge."""
         # Version label
         self.addSubview_(theme.label(
             constants.VERSION, NSMakeRect(20, 22, 120, 16),
