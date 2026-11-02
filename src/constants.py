@@ -36,7 +36,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 # --- Static Constants ---
-VERSION: str = "v1.4.1"
+VERSION: str = "v1.4.2"
 PLACEHOLDER_UUID: str = "AA:AA:AA:AA:AA:AA"
 MOCK_ADDRESS: str = "dev"
 

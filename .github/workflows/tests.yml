@@ -1,0 +1,29 @@
+# Runs the pytest suite on every push to dev
+name: Tests
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        env:
+          # Same as the release build
+          PYYAML_FORCE_LIBYAML: "0"
+        run: uv sync --locked --python 3.13
+
+      - name: Run tests
+        run: uv run --locked pytest

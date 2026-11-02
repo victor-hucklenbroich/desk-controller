@@ -48,13 +48,6 @@ DeskController's Bluetooth communication layer is based on [linak-controller](ht
 
 3. **Follow the setup and control your desk!**:
 
-### Build from source
-
-Developers can build locally instead of using the cask:
-```bash
-./packaging/dev/build.sh
-```
-
 ## Troubleshooting
 If something goes wrong during installation, check the output of `brew install` to find the issue. A likely culprit is a missing or outdated Homebrew installation.
 
@@ -72,6 +65,16 @@ To also delete its configuration and logs, add `--zap`:
 
 ```bash
 brew uninstall --zap --cask desk-controller
+```
+
+## Build from source
+
+Local builds use [uv](https://docs.astral.sh/uv/) and the universal2 Python 3.13 from [python.org](https://www.python.org/downloads/macos/):
+
+```bash
+brew install uv
+uv sync --python /Library/Frameworks/Python.framework/Versions/3.13/bin/python3
+./packaging/dev/build.sh
 ```
 
 ## Acknowledgements

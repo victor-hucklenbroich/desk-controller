@@ -1,8 +1,8 @@
 import os
 
 analysis = Analysis(
-    ['desk_controller/__main__.py'],
-    pathex=['desk_controller'],
+    ['src/__main__.py'],
+    pathex=['src'],
     binaries=[],
     datas=[('assets', 'assets')],
     hiddenimports=[
