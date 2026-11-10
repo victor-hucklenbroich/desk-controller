@@ -10,6 +10,7 @@ from bleak import BleakClient
 
 import constants
 from constants import LOGGER
+from control import discovery, pairing
 from control.config import ConfigParser
 from control.linak.desk import Desk
 from control.linak.mock import MockDeskClient
@@ -52,6 +53,7 @@ class DeskService(NSObject):
         self._max_seen_mm = 0.0
         self._observing_workspace = False
         self._retry_handle = None  # pending background auto-retry (loop thread)
+        self._pairing = False  # a pairing attempt owns the link; don't connect
         return self
 
     # --- Public API (main thread) ---
@@ -146,6 +148,84 @@ class DeskService(NSObject):
 
         future.add_done_callback(_completed)
 
+    # --- Discovery and pairing (main thread) ---
+
+    @objc.python_method
+    def discover_desks(self, on_done, on_found=None, timeout=None, simulated=False):
+        """Scan for nearby desks. on_found(desk) fires as each DiscoveredDesk
+        shows up, on_done(desks, error) once the scan ends, with error a
+        user-facing message when Bluetooth is unavailable. Both run on the main
+        thread. Returns a future whose cancel() ends the scan without on_done."""
+        if self._closing or self._loop is None:
+            return None
+        found = None
+        if on_found is not None:
+            def found(desk):
+                AppHelper.callAfter(on_found, desk)
+        future = asyncio.run_coroutine_threadsafe(
+            discovery.discover_desks(timeout, found, simulated=simulated), self._loop
+        )
+
+        def _completed(fut):
+            if fut.cancelled():
+                return
+            try:
+                desks, error = fut.result(), None
+            except discovery.BluetoothUnavailableError as e:
+                desks, error = [], str(e)
+            except Exception as e:
+                LOGGER.error(f"Desk scan failed: {e}")
+                desks, error = [], f"Scanning for desks failed: {e}"
+            AppHelper.callAfter(on_done, desks, error)
+
+        future.add_done_callback(_completed)
+        return future
+
+    @objc.python_method
+    def pair_desk(self, desk, on_done, on_step=None):
+        """Pair this Mac with a desk the user has put in pairing mode: a
+        DiscoveredDesk, or an address or name to scan for. Drops the current
+        connection and holds off reconnecting while pairing runs.
+        on_step(PairingStep) and on_done(PairingResult) run on the main thread.
+        When result.ok, store result.desk.address and call retry() to connect.
+        Returns a future whose cancel() aborts the attempt without on_done."""
+        if self._closing or self._loop is None:
+            return None
+        LOGGER.info("Pairing with a desk (user request)")
+        self._pairing = True
+        self._applyState(DeskState.IDLE)
+        step = None
+        if on_step is not None:
+            def step(value):
+                AppHelper.callAfter(on_step, value)
+        future = asyncio.run_coroutine_threadsafe(self._pair(desk, step), self._loop)
+
+        def _completed(fut):
+            # A cancel before the attempt started skips _pair's own cleanup
+            self._pairing = False
+            if fut.cancelled():
+                return
+            try:
+                result = fut.result()
+            except Exception as e:
+                LOGGER.error(f"Desk pairing failed: {e}")
+                result = pairing.PairingResult(
+                    pairing.PairingOutcome.FAILED, error=f"Pairing failed: {e}"
+                )
+            AppHelper.callAfter(on_done, result)
+
+        future.add_done_callback(_completed)
+        return future
+
+    @objc.python_method
+    async def _pair(self, desk, on_step):
+        try:
+            self._cancel_auto_retry()
+            await self._disconnect_current()
+            return await pairing.pair_desk(desk, on_step=on_step)
+        finally:
+            self._pairing = False
+
     # --- Connection lifecycle (BLE loop thread) ---
 
     @objc.python_method
@@ -169,6 +249,9 @@ class DeskService(NSObject):
     def _beginConnect(self, reason, initial_delay=0.0):
         """Kick off (re)connection. Main thread only."""
         if self._closing or self._loop is None:
+            return
+        if self._pairing:
+            LOGGER.info(f"Pairing in progress; not connecting ({reason})")
             return
         if constants.CONFIG_UUID == constants.PLACEHOLDER_UUID:
             LOGGER.info("No desk UUID configured yet; waiting for setup")
@@ -206,7 +289,7 @@ class DeskService(NSObject):
             if initial_delay:
                 await asyncio.sleep(initial_delay)
             failures = 0
-            while not self._closing and not self._suspended:
+            while not self._closing and not self._suspended and not self._pairing:
                 uuid = constants.CONFIG_UUID
                 if uuid == constants.PLACEHOLDER_UUID:
                     self._request_state(DeskState.IDLE)
@@ -225,6 +308,10 @@ class DeskService(NSObject):
                         self._perform_handshake(client),
                         timeout=constants.HANDSHAKE_TIMEOUT,
                     )
+                    if self._pairing:
+                        # Pairing started meanwhile and needs the desk free
+                        await self._safe_disconnect(client)
+                        return
                     self._client = client
                     self._desk = desk
                     self._max_seen_mm = 0.0
@@ -243,6 +330,8 @@ class DeskService(NSObject):
                 except Exception as e:
                     LOGGER.warning(f"Desk connection attempt failed: {e}")
                     await self._safe_disconnect(client)
+                    if self._pairing:
+                        return
                     failures += 1
                     if failures >= constants.MAX_RECONNECT_FAILURES:
                         LOGGER.error("Desk unreachable after retries")
@@ -309,7 +398,7 @@ class DeskService(NSObject):
             return  # deliberate disconnect or a stale client from an old session
         self._client = None
         self._desk = None
-        if self._closing or self._suspended:
+        if self._closing or self._suspended or self._pairing:
             return
         if not constants.CONFIG_AUTO_CONNECT:
             LOGGER.warning("Lost connection to desk; auto-connect is off")
@@ -328,7 +417,7 @@ class DeskService(NSObject):
         """Queue a background reconnect after AUTO_RETRY_DELAY so a desk that is
         off/unreachable recovers on its own without the user intervening."""
         self._cancel_auto_retry()
-        if (self._closing or self._suspended or self._loop is None
+        if (self._closing or self._suspended or self._pairing or self._loop is None
                 or not constants.CONFIG_AUTO_CONNECT):
             return
         LOGGER.info(
@@ -349,7 +438,7 @@ class DeskService(NSObject):
     def _auto_retry_fire(self):
         """Start a fresh reconnect burst if still not connected."""
         self._retry_handle = None
-        if self._closing or self._suspended:
+        if self._closing or self._suspended or self._pairing:
             return
         if not constants.CONFIG_AUTO_CONNECT:
             return  # turned off since the retry was scheduled

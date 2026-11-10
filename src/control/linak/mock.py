@@ -22,6 +22,7 @@ START_HEIGHT_MM = 750
 SPEED_MM_S = 35
 
 CONNECT_DELAY = 1.0
+PAIRING_DELAY = 1.5
 RESPONSE_DELAY = 0.02
 TICK = 0.1
 
@@ -42,6 +43,9 @@ _REFERENCE_OUTPUT = ReferenceOutputService.ONE.uuid.lower()
 
 class MockDeskClient:
     _height = (START_HEIGHT_MM - BASE_HEIGHT_MM) * 10
+    # Whether the simulated desk is paired with this Mac. Like a real desk in
+    # pairing mode, it pairs a moment into its first connection.
+    paired = False
 
     def __init__(self, address, disconnected_callback=None, **kwargs):
         self.address = address
@@ -61,6 +65,8 @@ class MockDeskClient:
         await asyncio.sleep(CONNECT_DELAY)
         self._connected = True
         logger.log("Mock desk connected")
+        if not MockDeskClient.paired:
+            asyncio.get_running_loop().call_later(PAIRING_DELAY, self._pair)
         return True
 
     async def disconnect(self) -> bool:
@@ -101,6 +107,11 @@ class MockDeskClient:
         self._notify.pop(str(char).lower(), None)
 
     # --- Simulation ---
+
+    def _pair(self) -> None:
+        if self._connected and not MockDeskClient.paired:
+            MockDeskClient.paired = True
+            logger.log("Mock desk paired")
 
     def _characteristic(self, char) -> str:
         if not self._connected:

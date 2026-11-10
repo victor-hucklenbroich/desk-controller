@@ -54,6 +54,12 @@ HANDSHAKE_TIMEOUT: float = 15.0 # seconds
 AUTO_RETRY_DELAY: float = 360.0 # seconds
 
 
+# --- Desk discovery and pairing constants ---
+SCAN_TIMEOUT: float = 8.0 # seconds
+PAIRING_TIMEOUT: float = 30.0
+PAIRING_POLL_INTERVAL: float = 0.5 # seconds
+
+
 # --- Preference constants ---
 DEFAULT_PRESET_1_NAME: str = "Sit"
 DEFAULT_PRESET_2_NAME: str = "Stand"
