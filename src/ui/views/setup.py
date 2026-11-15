@@ -44,7 +44,7 @@ class InitialSetupView(NSView):
             size=16, weight=theme.WEIGHT_SEMIBOLD,
         ))
         self.addSubview_(theme.label(
-            "Enter your desk's Bluetooth address to get started",
+            "Find your desk, or enter its Bluetooth address",
             NSMakeRect(pad, 104, inner, 18),
             size=12, color=NSColor.secondaryLabelColor(),
         ))
@@ -63,9 +63,20 @@ class InitialSetupView(NSView):
         self.uuid_field.setAlignment_(theme.ALIGN_CENTER)
         self.addSubview_(self.uuid_field)
 
-        # Connect button (primary, default action)
+        # Find Desk… and Connect side by side, Connect being the default action
+        button_w, gap = 120, 12
+        left = (width - 2 * button_w - gap) / 2
+        find_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(left, 18, button_w, 30)
+        )
+        find_button.setTitle_("Find Desk…")
+        find_button.setBezelStyle_(1)
+        find_button.setTarget_(self)
+        find_button.setAction_("findDesk:")
+        self.addSubview_(find_button)
+
         connect_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect((width - 120) / 2, 18, 120, 30)
+            NSMakeRect(left + button_w + gap, 18, button_w, 30)
         )
         connect_button.setTitle_("Connect")
         connect_button.setBezelStyle_(1)
@@ -86,6 +97,11 @@ class InitialSetupView(NSView):
     def focusTextField(self):
         self.window().makeKeyWindow()
         self.window().makeFirstResponder_(self.uuid_field)
+
+    def findDesk_(self, sender):
+        """Opens the Find Desk window."""
+        LOGGER.debug("Find Desk button pressed")
+        self.app.openFindDesk()
 
     def connect_(self, sender):
         uuid = self.uuid_field.stringValue()

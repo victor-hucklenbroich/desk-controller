@@ -18,10 +18,12 @@ from ui.views.setup import InitialSetupView
 from ui.views.slider import SliderView
 from ui.views.no_connection import NoConnectionView
 from ui.views.settings import SettingsView, SETTINGS_WIDTH, SETTINGS_HEIGHT
+from ui.views.find_desk import FindDeskView, FIND_DESK_WIDTH, FIND_DESK_HEIGHT
 from ui.timer import _TimerProxy
 from ui import window
 from ui import glass
 from ui import theme
+from control import config
 from control.desk_service import DeskService
 from constants import LOGGER
 import constants
@@ -72,6 +74,7 @@ class MenuBarApp(NSObject):
             self.popover_window = None
             self.settings_window = None
             self.settings_view = None
+            self.find_desk_window = None
             self.current_content = None
             self.is_visible = False
             self.slider_view = None
@@ -351,6 +354,41 @@ class MenuBarApp(NSObject):
         """Hides the settings window."""
         if self.settings_window:
             self.settings_window.close()
+
+    def openFindDesk(self):
+        """Opens the window that finds desks nearby and pairs with one. When it
+        is open already it only comes to the front, so a running scan or
+        pairing attempt carries on."""
+        self.hidePopover()
+        if self.find_desk_window is None:
+            rect = NSMakeRect(0, 0, FIND_DESK_WIDTH, FIND_DESK_HEIGHT)
+            self.find_desk_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+                rect,
+                NSWindowStyleMaskTitled | NSWindowStyleMaskClosable,
+                NSBackingStoreBuffered,
+                False
+            )
+            self.find_desk_window.setTitle_("Find Desk")
+            self.find_desk_window.setReleasedWhenClosed_(False)
+            self.find_desk_window.center()
+        if not self.find_desk_window.isVisible():
+            view = FindDeskView.alloc().initWithApp_(self)
+            self.find_desk_window.setContentView_(view)
+            self.find_desk_window.setDelegate_(view)
+        Cocoa.NSApp.activateIgnoringOtherApps_(True)
+        self.find_desk_window.makeKeyAndOrderFront_(None)
+
+    @objc.python_method
+    def deskPaired(self, address):
+        """A desk was paired in the Find Desk window: make it the configured
+        desk and connect to it."""
+        LOGGER.info(f"Paired desk {address} is now the configured desk")
+        config.ConfigParser.update(address)
+        if self.settings_view is not None:
+            # Otherwise Apply would write the previous address back
+            self.settings_view.uuid_field.setStringValue_(address)
+        self.desk.retry()
+        self.checkAndUpdatePopover()
 
     def quitApp_(self, sender):
         """Menu-driven quit; mirrors the popover's Quit button."""

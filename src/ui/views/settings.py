@@ -72,14 +72,25 @@ class SettingsView(NSView):
 
     @objc.python_method
     def _buildConnectionSection_(self, top):
-        """Desk address, auto-connect and Disconnect. Returns the bottom edge."""
+        """Desk address with Find Desk…, auto-connect and Disconnect. Returns
+        the bottom edge."""
         label_y = top - 16
         self.addSubview_(self._fieldLabel_("Desk address", label_y))
         field_y = label_y - 2 - 24
-        self.uuid_field = self._textField_(field_y)
+        self.uuid_field = self._textField_(field_y, width=234)
         self.uuid_field.setPlaceholderString_("AA:AA:AA:AA:AA:AA")
         self.uuid_field.setStringValue_(constants.CONFIG_UUID)
         self.addSubview_(self.uuid_field)
+
+        # Find Desk… beside the field, vertically centred on it
+        find_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(262, field_y - 3, 108, 30)
+        )
+        find_button.setTitle_("Find Desk…")
+        find_button.setBezelStyle_(1)
+        find_button.setTarget_(self)
+        find_button.setAction_("findDesk:")
+        self.addSubview_(find_button)
 
         # Disconnect button, only enabled while a desk is connected, with the
         # auto-connect checkbox vertically centred beside it
@@ -304,6 +315,11 @@ class SettingsView(NSView):
             self.app.desk.retry()
         self.app.checkAndUpdatePopover()
         self.app.refreshStatusItem()
+
+    def findDesk_(self, sender):
+        """Opens the Find Desk window."""
+        LOGGER.debug("Find Desk button pressed")
+        self.app.openFindDesk()
 
     def disconnect_(self, sender):
         """Drops the desk connection right away, until the user connects again."""

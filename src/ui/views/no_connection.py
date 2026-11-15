@@ -71,9 +71,21 @@ class NoConnectionView(NSView):
         self.uuid_field.setAlignment_(theme.ALIGN_CENTER)
         self.addSubview_(self.uuid_field)
 
-        # Try again / connect button (primary, default action)
+        # Find Desk… and Try Again / Connect side by side, the latter being
+        # the default action
+        button_w, gap = 120, 12
+        left = (width - 2 * button_w - gap) / 2
+        find_button = Cocoa.NSButton.alloc().initWithFrame_(
+            NSMakeRect(left, 18, button_w, 30)
+        )
+        find_button.setTitle_("Find Desk…")
+        find_button.setBezelStyle_(1)
+        find_button.setTarget_(self)
+        find_button.setAction_("findDesk:")
+        self.addSubview_(find_button)
+
         retry_button = Cocoa.NSButton.alloc().initWithFrame_(
-            NSMakeRect((width - 120) / 2, 18, 120, 30)
+            NSMakeRect(left + button_w + gap, 18, button_w, 30)
         )
         retry_button.setTitle_("Try Again" if failed else "Connect")
         retry_button.setBezelStyle_(1)
@@ -86,6 +98,11 @@ class NoConnectionView(NSView):
         """Opens the settings window."""
         LOGGER.debug("Settings button pressed")
         self.app.openSettings()
+
+    def findDesk_(self, sender):
+        """Opens the Find Desk window."""
+        LOGGER.debug("Find Desk button pressed")
+        self.app.openFindDesk()
 
     def retry_(self, sender):
         """Triggers user initiated server retry"""
