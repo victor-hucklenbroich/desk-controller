@@ -149,7 +149,10 @@ for i in range(15):
 
 
 def icon_frame(height_cm):
-    """Returns the desk icon sprite matching a height within the travel range."""
+    """Returns the desk icon sprite matching a height within the travel range,
+    or the lowest one while the height is unknown (None)."""
+    if height_cm is None:
+        return ICON_FRAMES[0]
     last = len(ICON_FRAMES) - 1
     normalized = (height_cm - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)
     return ICON_FRAMES[max(0, min(last, round(normalized * last)))]

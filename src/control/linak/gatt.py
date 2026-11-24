@@ -6,6 +6,7 @@ from .util import Height, Speed, make_iter
 
 
 DPG_NOTIFY_TIMEOUT = 8.0
+MAX_POSITION = 8000
 
 
 class Characteristic:
@@ -76,10 +77,12 @@ class ReferenceInputService(Service):
 
     @classmethod
     def encode_height(cls, height: Union[int, str]) -> bytearray:
-        try:
-            return bytearray(struct.pack("<H", int(height)))
-        except struct.error:
-            raise ValueError("Height must be an integer between 0 and 65535")
+        """Refuses targets beyond the travel a desk can have: the controller
+        reads them as signed, so one past 0x7FFF drives the desk down."""
+        height = int(height)
+        if not 0 <= height <= MAX_POSITION:
+            raise ValueError(f"Height must be an integer between 0 and {MAX_POSITION}")
+        return bytearray(struct.pack("<H", height))
 
 
 # Reference Output
@@ -95,12 +98,15 @@ class ReferenceOutputService(Service):
     ONE = ReferenceOutputOneCharacteristic
 
     @classmethod
-    def decode_height_speed(cls, data: bytearray) -> Tuple[Height, Speed]:
-        height, speed = struct.unpack("<Hh", data)
-        return Height(height), Speed(speed)
+    def decode_height_speed(cls, data: bytearray) -> Tuple[Optional[Height], Speed]:
+        """The height is None when the desk doesn't know its position: one that
+        lost track of it reports a position beyond its travel, e.g. 9e ff
+        (-9.8mm), until it's reset from its control panel."""
+        height, speed = struct.unpack("<hh", data)
+        return (Height(height) if 0 <= height <= MAX_POSITION else None), Speed(speed)
 
     @classmethod
-    async def get_height_speed(cls, client: BleakClient) -> Tuple[Height, Speed]:
+    async def get_height_speed(cls, client: BleakClient) -> Tuple[Optional[Height], Speed]:
         data = await cls.ONE.read(client)
         return cls.decode_height_speed(data)
 

@@ -7,6 +7,7 @@ import yaml
 import constants
 from control import desk_service
 from control.desk_service import DeskService, DeskState
+from control.linak.mock import MockDeskClient
 from control.linak.util import Height, Speed
 
 
@@ -32,6 +33,30 @@ async def test_connect_reports_height_and_adopts_desk_base(service, monkeypatch)
     assert service.is_healthy()
     assert constants.MIN_HEIGHT == 62.0
     service._app.deskHeightChanged.assert_called_with(75, False)
+
+
+async def test_desk_that_lost_its_position_shows_as_unknown_and_stays_put(
+        service, monkeypatch, config_file):
+    monkeypatch.setattr(MockDeskClient, "_height", -98)
+    service._loop = asyncio.get_running_loop()
+
+    await service._connect()
+
+    assert service.is_healthy()
+    service._app.deskHeightChanged.assert_called_with(None, False)
+    assert constants.MAX_HEIGHT == 127.0
+    assert yaml.safe_load(config_file.read_text())["max_height"] == 1270
+    assert not await service._do_move(100)
+    assert MockDeskClient._height == -98
+
+
+async def test_targets_beyond_the_desks_travel_are_never_sent(service):
+    service._loop = asyncio.get_running_loop()
+    await service._connect()
+
+    assert not await service._do_move(716.9)
+    height, _ = await service._desk.get_height_speed()
+    assert height.human == 750  # never moved
 
 
 async def test_unreachable_desk_gives_up_and_schedules_a_retry(service, monkeypatch):

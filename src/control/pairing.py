@@ -17,9 +17,9 @@ _log = logging.getLogger(__name__)
 
 
 class PairingStep(Enum):
-    SEARCHING = "searching"  # scanning for a desk given by address or name
+    SEARCHING = "searching"
     CONNECTING = "connecting"
-    PAIRING = "pairing"  # connected; macOS may ask the user to confirm
+    PAIRING = "pairing"
 
 
 class PairingOutcome(Enum):
@@ -35,8 +35,8 @@ class PairingOutcome(Enum):
 class PairingResult:
     outcome: PairingOutcome
     desk: Optional[DiscoveredDesk] = None
-    height_mm: Optional[int] = None  # current height, read after pairing
-    error: Optional[str] = None  # user-facing reason when not ok
+    height_mm: Optional[int] = None
+    error: Optional[str] = None
 
     @property
     def ok(self) -> bool:
@@ -138,7 +138,8 @@ async def pair_desk(
             outcome = PairingOutcome.ALREADY_PAIRED if was_paired else PairingOutcome.PAIRED
         _log.info(f"Pairing with {desk.address} finished: {outcome.value}")
         return PairingResult(
-            outcome, dataclasses.replace(desk, paired=paired), height_mm=height.human,
+            outcome, dataclasses.replace(desk, paired=paired),
+            height_mm=None if height is None else height.human,
         )
     except asyncio.TimeoutError:
         _log.warning(f"Pairing: {desk.address} did not answer in time")

@@ -44,7 +44,7 @@ class SliderView(NSView):
         self = self.initWithFrame_(frame)
         self.buildUI()
 
-        if app.move_in_progress or app.external_move_active:
+        if app.move_in_progress or app.external_move_active or app.current_height is None:
             self.setUIState_(False)
 
         return self
@@ -83,7 +83,8 @@ class SliderView(NSView):
         self.slider.setCell_(custom_cell)
         self.slider.setMinValue_(constants.MIN_HEIGHT)
         self.slider.setMaxValue_(constants.MAX_HEIGHT)
-        self.slider.setDoubleValue_(self.app.current_height)
+        if self.app.current_height is not None:
+            self.slider.setDoubleValue_(self.app.current_height)
         self.slider.setTarget_(self)
         self.slider.setAction_("sliderChanged:")
         self.addSubview_(self.slider)
@@ -120,7 +121,7 @@ class SliderView(NSView):
 
     @objc.python_method
     def _formatHeight(self, cm):
-        return f"{int(round(cm))} cm"
+        return "Needs a reset" if cm is None else f"{int(round(cm))} cm"
 
     def refreshHeight_(self, cm):
         """Updates the live height readout shown above the slider."""
@@ -134,10 +135,12 @@ class SliderView(NSView):
     @staticmethod
     @objc.python_method
     def updateUI(status_item, slider, height_value, move_slider_handle, update_text=True):
-        """Function to update all dynamic UI elements."""
+        """Function to update all dynamic UI elements. height_value is None
+        while the desk doesn't know its position."""
         # height display update
         if update_text:
-            title = f"{height_value:>4}cm " if constants.CONFIG_SHOW_HEIGHT else ""
+            shown = "–" if height_value is None else height_value
+            title = f"{shown:>4}cm " if constants.CONFIG_SHOW_HEIGHT else ""
             attr_title = NSAttributedString.alloc().initWithString_attributes_(
                 title, {NSFontAttributeName: constants.MONO_FONT}
             )
@@ -147,7 +150,7 @@ class SliderView(NSView):
         status_item.button().setImage_(constants.icon_frame(height_value))
 
         # slider update
-        if move_slider_handle:
+        if move_slider_handle and height_value is not None:
             slider.setDoubleValue_(height_value)
 
     def setUIState_(self, enabled):

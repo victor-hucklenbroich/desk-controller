@@ -13,7 +13,8 @@ from .gatt import (
 from .util import logger, bytes_to_hex, Height, Speed
 
 
-SubscriberCallback = Callable[[Height, Speed], Union[None, Awaitable[None]]]
+SubscriberCallback = Callable[[Optional[Height], Speed], Union[None, Awaitable[None]]]
+WRONG_WAY_TOLERANCE = 200
 
 
 class Desk:
@@ -110,7 +111,8 @@ class Desk:
         """Internal BLE notification handler. Decodes data, updates the cache,
         and fans out to every registered subscriber."""
         height, speed = ReferenceOutputService.decode_height_speed(data)
-        height.base_height = self.config["base_height"]
+        if height is not None:
+            height.base_height = self.config["base_height"]
         self.latest_height = height
         self.latest_speed = speed
 
@@ -127,31 +129,44 @@ class Desk:
             self.client, ControlService.COMMAND.CMD_WAKEUP
         )
 
-    async def move_to(self, target: Height) -> None:
-        initial_height, speed = await ReferenceOutputService.get_height_speed(self.client)
-        initial_height.base_height = self.config["base_height"]
-        if initial_height.value == target.value:
-            return
+    async def move_to(self, target: Height) -> bool:
+        """Moves the desk to the target; returns False if it refused to or had
+        to stop the desk early. A desk that doesn't know its position isn't
+        moved, and one that loses it or moves away from the target is stopped."""
+        data = ReferenceInputService.encode_height(target.value)
+        height, speed = await self.get_height_speed()
+        if height is None:
+            logger.log("Not moving the desk: it doesn't know its position until it's reset")
+            return False
+        if height.value == target.value:
+            return True
 
         await self.wakeup()
         await self.stop()
 
-        data = ReferenceInputService.encode_height(target.value)
-
+        distance = abs(target.value - height.value)
         while True:
             await ReferenceInputService.ONE.write(self.client, data)
             await asyncio.sleep(self.config["move_command_period"])
-            height, speed = await ReferenceOutputService.get_height_speed(self.client)
-            height.base_height = self.config["base_height"]
+            height, speed = await self.get_height_speed()
+            if height is None:
+                await self.stop()
+                logger.log("Stopped the desk: it lost track of its position")
+                return False
+            if abs(target.value - height.value) > distance + WRONG_WAY_TOLERANCE:
+                await self.stop()
+                logger.log("Stopped the desk: it was moving away from the target")
+                return False
             if speed.value == 0:
-                break
+                return True
             logger.log(
                 "Height:{:4.0f}mm Speed: {:2.0f}mm/s".format(height.human, speed.human)
             )
 
-    async def get_height_speed(self) -> Tuple[Height, Speed]:
+    async def get_height_speed(self) -> Tuple[Optional[Height], Speed]:
         height, speed = await ReferenceOutputService.get_height_speed(self.client)
-        height.base_height = self.config["base_height"]
+        if height is not None:
+            height.base_height = self.config["base_height"]
         return height, speed
 
     async def stop(self) -> None:

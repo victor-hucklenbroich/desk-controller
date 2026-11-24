@@ -13,6 +13,7 @@ from constants import LOGGER
 from control import discovery, pairing
 from control.config import ConfigParser
 from control.linak.desk import Desk
+from control.linak.gatt import MAX_POSITION
 from control.linak.mock import MockDeskClient
 from control.linak.util import Height
 
@@ -315,13 +316,22 @@ class DeskService(NSObject):
                     self._client = client
                     self._desk = desk
                     self._max_seen_mm = 0.0
-                    LOGGER.info(f"Connected to desk at {height.human}mm")
+                    if height is None:
+                        LOGGER.warning(
+                            "Connected to desk, but it doesn't know its position "
+                            "until it's reset"
+                        )
+                    else:
+                        LOGGER.info(f"Connected to desk at {height.human}mm")
 
                     base_mm = (
                         None if desk.base_height_estimated
                         else float(desk.config["base_height"])
                     )
-                    max_mm = max(constants.MAX_HEIGHT * 10.0, float(height.human))
+                    max_mm = (
+                        None if height is None
+                        else max(constants.MAX_HEIGHT * 10.0, float(height.human))
+                    )
                     AppHelper.callAfter(self._applyLimits, base_mm, max_mm)
 
                     self._push_height(height, speed)
@@ -456,12 +466,11 @@ class DeskService(NSObject):
         # The desk works in mm, the UI in cm; convert without losing precision
         target_mm = int(round(target_cm * 10))
         target = Height(target_mm, desk.config["base_height"], True)
-        if target.value < 0 or target.value > 65535:
+        if not 0 <= target.value <= MAX_POSITION:
             LOGGER.warning(f"Target height {target_cm}cm is out of range for this desk")
             return False
         LOGGER.info(f"Moving desk to {target_mm}mm")
-        await desk.move_to(target)
-        return True
+        return await desk.move_to(target)
 
     @objc.python_method
     def _handle_move_failure(self):
@@ -484,9 +493,13 @@ class DeskService(NSObject):
 
     @objc.python_method
     def _push_height(self, height, speed):
+        moving = bool(speed is not None and speed.value != 0)
+        if height is None:
+            # The desk doesn't know its position until it's reset
+            AppHelper.callAfter(self._notifyHeight, None, moving)
+            return
         mm = float(height.human)
         cm = int(round(mm / 10.0))
-        moving = bool(speed is not None and speed.value != 0)
         if mm > self._max_seen_mm:
             self._max_seen_mm = mm
         if moving != self._was_moving:

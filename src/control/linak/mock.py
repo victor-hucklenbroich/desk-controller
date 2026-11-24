@@ -91,7 +91,7 @@ class MockDeskClient:
     async def write_gatt_char(self, char, data, response=None) -> None:
         uuid = self._characteristic(char)
         if uuid == _REFERENCE_INPUT:
-            self._start_move(struct.unpack("<H", data)[0])
+            self._start_move(struct.unpack("<h", data)[0])
         elif uuid == _CONTROL:
             if data[0] == ControlService.COMMAND.CMD_STOP:
                 self._halt()
@@ -124,7 +124,7 @@ class MockDeskClient:
             callback(uuid, bytearray(data))
 
     def _height_speed(self) -> bytearray:
-        return bytearray(struct.pack("<Hh", MockDeskClient._height, self._speed))
+        return bytearray(struct.pack("<hh", MockDeskClient._height, self._speed))
 
     def _answer_dpg(self, data) -> None:
         """Answers a DPG command with a notification: [1, length, payload...]."""
