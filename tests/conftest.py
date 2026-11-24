@@ -1,13 +1,14 @@
 """
-Shared test setup. Importing `constants` creates and reads
-~/Library/Application Support/DeskController/config.yaml and a log file, so
-HOME is pointed at a throwaway directory first. Tests never use the real
-config or Bluetooth.
+Shared test setup. Importing `constants` reads the settings in
+~/Library/Application Support/DeskController and creates a log file, so HOME
+is pointed at a throwaway directory first. Tests never use the real config or
+Bluetooth.
 """
 import asyncio
 import inspect
 import os
 import tempfile
+from pathlib import Path
 
 _home = tempfile.TemporaryDirectory(prefix="deskcontroller-tests-")
 os.environ["HOME"] = _home.name
@@ -30,19 +31,27 @@ def pytest_pyfunc_call(pyfuncitem):
 
 
 @pytest.fixture(autouse=True)
-def config_file(tmp_path, monkeypatch):
-    """A default config.yaml per test. Restores the runtime settings that the
-    code under test rewrites on `constants`."""
-    path = tmp_path / "config.yaml"
-    path.write_text(yaml.safe_dump(constants.DEFAULT_CONFIG))
-    monkeypatch.setattr(constants, "CONFIG_FILE_PATH", str(path))
+def desk_file(tmp_path, monkeypatch):
+    """Per test, a config.yaml naming the simulated desk as the current one
+    and that desk's settings file with the defaults, which is returned.
+    Restores the runtime settings that the code under test rewrites on
+    `constants`."""
+    config = tmp_path / "config.yaml"
+    monkeypatch.setattr(constants, "CONFIG_FILE_PATH", str(config))
+    monkeypatch.setattr(constants, "DESKS_PATH", str(tmp_path / "desks"))
     for name in (
         "CONFIG_UUID", "CONFIG_AUTO_CONNECT", "CONFIG_SHOW_HEIGHT",
         "CONFIG_PRESET_1", "CONFIG_PRESET_1_NAME",
-        "CONFIG_PRESET_2", "CONFIG_PRESET_2_NAME",
-        "MIN_HEIGHT", "MAX_HEIGHT",
+        "CONFIG_PRESET_2", "CONFIG_PRESET_2_NAME", "CONFIG_BASE_HEIGHT",
+        "CONNECTION_TIMEOUT", "MOVE_COMMAND_PERIOD", "MIN_HEIGHT", "MAX_HEIGHT",
     ):
         monkeypatch.setattr(constants, name, getattr(constants, name))
+
+    path = Path(constants.desk_file(constants.MOCK_ADDRESS))
+    path.parent.mkdir()
+    path.write_text(yaml.safe_dump(constants.DEFAULT_DESK_CONFIG))
+    config.write_text(yaml.safe_dump({"desk": constants.MOCK_ADDRESS}))
+    constants.load_desk(constants.MOCK_ADDRESS)
     return path
 
 

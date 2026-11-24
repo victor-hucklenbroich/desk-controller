@@ -6,6 +6,7 @@ import yaml
 
 import constants
 from control import desk_service
+from control.config import ConfigParser
 from control.desk_service import DeskService, DeskState
 from control.linak.mock import MockDeskClient
 from control.linak.util import Height, Speed
@@ -17,7 +18,6 @@ def service(monkeypatch, fast_mock):
     their own event loop rather than its background thread, and main-thread
     hand-offs run inline."""
     monkeypatch.setattr(desk_service.AppHelper, "callAfter", lambda fn, *args: fn(*args))
-    monkeypatch.setattr(constants, "CONFIG_UUID", constants.MOCK_ADDRESS)
     monkeypatch.setattr(constants, "RECONNECT_DELAY", 0)
     service = DeskService.alloc().init()
     service.setApp(Mock())
@@ -36,7 +36,7 @@ async def test_connect_reports_height_and_adopts_desk_base(service, monkeypatch)
 
 
 async def test_desk_that_lost_its_position_shows_as_unknown_and_stays_put(
-        service, monkeypatch, config_file):
+        service, monkeypatch, desk_file):
     monkeypatch.setattr(MockDeskClient, "_height", -98)
     service._loop = asyncio.get_running_loop()
 
@@ -45,7 +45,7 @@ async def test_desk_that_lost_its_position_shows_as_unknown_and_stays_put(
     assert service.is_healthy()
     service._app.deskHeightChanged.assert_called_with(None, False)
     assert constants.MAX_HEIGHT == 127.0
-    assert yaml.safe_load(config_file.read_text())["max_height"] == 1270
+    assert yaml.safe_load(desk_file.read_text())["max_height"] == 1270
     assert not await service._do_move(100)
     assert MockDeskClient._height == -98
 
@@ -116,7 +116,7 @@ async def test_user_disconnect_sticks(service):
     assert service.is_idle()
 
 
-def test_taller_desk_raises_and_persists_max_height(service, config_file):
+def test_taller_desk_raises_and_persists_max_height(service, desk_file):
     top = Height(6700, base_height=620)  # 1290mm, above the 1270mm default
 
     service._push_height(top, Speed(350))
@@ -124,5 +124,8 @@ def test_taller_desk_raises_and_persists_max_height(service, config_file):
     service._push_height(top, Speed(0))
 
     assert constants.MAX_HEIGHT == 129.0
-    assert yaml.safe_load(config_file.read_text())["max_height"] == 1290
+    assert yaml.safe_load(desk_file.read_text())["max_height"] == 1290
     service._app.deskLimitsChanged.assert_called_once()
+
+    ConfigParser.select_desk("00000000-0000-4000-8000-000000000002")
+    assert constants.MAX_HEIGHT == 127.0
