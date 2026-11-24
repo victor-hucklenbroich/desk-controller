@@ -147,11 +147,10 @@ def _save(address):
     from AppKit import NSRunningApplication
     from control.config import ConfigParser
 
-    ConfigParser.update(uuid=address)
+    ConfigParser.select_desk(address)
     print(f"Saved as DeskController's desk in {constants.CONFIG_FILE_PATH}")
     if NSRunningApplication.runningApplicationsWithBundleIdentifier_(BUNDLE_ID):
-        print("DeskController is running: quit and reopen it now, before changing "
-              "its settings, so it doesn't write back the old desk.")
+        print("DeskController is running: quit and reopen it to switch to this desk.")
 
 
 def main(argv=None):

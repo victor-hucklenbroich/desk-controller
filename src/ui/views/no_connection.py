@@ -110,7 +110,7 @@ class NoConnectionView(NSView):
         uuid = self.uuid_field.stringValue()
         if uuid != constants.CONFIG_UUID:
             LOGGER.info(f"user updated UUID: {uuid}")
-            config.ConfigParser.update(uuid)
+            config.ConfigParser.select_desk(uuid)
         self.app.desk.retry()
         self.app.checkAndUpdatePopover()
 

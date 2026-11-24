@@ -40,8 +40,8 @@ class PairingResult:
 
     @property
     def ok(self) -> bool:
-        """The desk is ready for use: store desk.address as the config's
-        mac_address and connect."""
+        """The desk is ready for use: select it by desk.address and
+        connect."""
         return self.outcome in (
             PairingOutcome.PAIRED, PairingOutcome.ALREADY_PAIRED, PairingOutcome.UNKNOWN,
         )

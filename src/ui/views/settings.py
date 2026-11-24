@@ -287,7 +287,8 @@ class SettingsView(NSView):
         icon.setImage_(constants.icon_frame(sender.doubleValue()))
 
     def apply_(self, sender):
-        """Persists the entered preferences to config.yaml and runtime constants."""
+        """Saves the entered preferences as the current desk's settings, then
+        switches to the desk entered if it's another one."""
         uuid = self.uuid_field.stringValue().strip()
         preset_1 = int(round(self.preset_1_slider.doubleValue()))
         preset_2 = int(round(self.preset_2_slider.doubleValue()))
@@ -304,10 +305,12 @@ class SettingsView(NSView):
             f"show_height={show_height}, auto_connect={auto_connect})"
         )
         config.ConfigParser.update(
-            uuid, preset_1=preset_1, preset_2=preset_2,
+            preset_1=preset_1, preset_2=preset_2,
             preset_1_name=preset_1_name, preset_2_name=preset_2_name,
             show_height=show_height, auto_connect=auto_connect,
         )
+        if uuid_changed:
+            config.ConfigParser.select_desk(uuid)
 
         self.app.closeSettings()
 

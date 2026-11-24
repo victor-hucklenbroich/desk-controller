@@ -385,10 +385,9 @@ class MenuBarApp(NSObject):
         """A desk was paired in the Find Desk window: make it the configured
         desk and connect to it."""
         LOGGER.info(f"Paired desk {address} is now the configured desk")
-        config.ConfigParser.update(address)
-        if self.settings_view is not None:
-            # Otherwise Apply would write the previous address back
-            self.settings_view.uuid_field.setStringValue_(address)
+        config.ConfigParser.select_desk(address)
+        if self.settings_window is not None and self.settings_window.isVisible():
+            self.openSettings()
         self.desk.retry()
         self.checkAndUpdatePopover()
 

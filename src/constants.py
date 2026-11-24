@@ -17,7 +17,10 @@ else:
     base_path = Path(os.path.dirname(__file__)).parent
 
 LIBRARY_PATH = os.path.expanduser("~/Library/")
+# Names the current desk by its address
 CONFIG_FILE_PATH = os.path.join(LIBRARY_PATH, "Application Support", "DeskController","config.yaml")
+# Each desk's settings, in a file named after its address
+DESKS_PATH = os.path.join(os.path.dirname(CONFIG_FILE_PATH), "desks")
 
 
 # --- Logging Configuration ---
@@ -64,8 +67,8 @@ PAIRING_POLL_INTERVAL: float = 0.5 # seconds
 DEFAULT_PRESET_1_NAME: str = "Sit"
 DEFAULT_PRESET_2_NAME: str = "Stand"
 
-DEFAULT_CONFIG: dict = {
-    "mac_address": PLACEHOLDER_UUID,
+# Settings a desk starts off with in its file
+DEFAULT_DESK_CONFIG: dict = {
     "presets": {
         "preset_1": {"name": DEFAULT_PRESET_1_NAME, "height": 750},
         "preset_2": {"name": DEFAULT_PRESET_2_NAME, "height": 1240},
@@ -75,18 +78,22 @@ DEFAULT_CONFIG: dict = {
     "auto_connect": True,
 }
 
-if not os.path.exists(CONFIG_FILE_PATH):
-    LOGGER.warning("config.yaml not found, creating default one")
-    os.makedirs(os.path.dirname(CONFIG_FILE_PATH), exist_ok=True)
-    with open(CONFIG_FILE_PATH, "w") as out:
-        yaml.safe_dump(DEFAULT_CONFIG, out, default_flow_style=False)
 
-try:
-    with open(CONFIG_FILE_PATH) as stream:
-        CONFIG = yaml.safe_load(stream) or {}
-except (OSError, yaml.YAMLError) as e:
-    LOGGER.warning(f"Error reading config.yaml: {e}")
-    CONFIG = {}
+def read_yaml(path):
+    """A config file's contents; empty when it's missing or can't be read."""
+    try:
+        with open(path) as stream:
+            return yaml.safe_load(stream) or {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, yaml.YAMLError) as e:
+        LOGGER.warning(f"Error reading {path}: {e}")
+        return {}
+
+
+def desk_file(address):
+    """Path of the settings file of the desk with this address."""
+    return os.path.join(DESKS_PATH, f"{address}.yaml")
 
 
 def preset_name(name, default):
@@ -99,42 +106,52 @@ def preset_name(name, default):
     return name or default
 
 
-def _preset(key, legacy_key, default_height, default_name):
-    """Reads a preset as (height in cm, name). Configs from before presets
-    could be renamed keyed the heights by "sit"/"stand", so those still count."""
-    preset = _presets.get(key)
+def _preset(presets, key, default_height, default_name):
+    """Reads a preset as (height in cm, name)."""
+    preset = presets.get(key)
     if not isinstance(preset, dict):
         preset = {}
-    height = int(preset.get("height", _presets.get(legacy_key, default_height)))
+    height = int(preset.get("height", default_height))
     return int(height / 10), preset_name(preset.get("name"), default_name)
 
 
-_presets = CONFIG.get("presets") or {}
-CONFIG_UUID: str = str(CONFIG.get("mac_address", PLACEHOLDER_UUID))
-CONFIG_PRESET_1, CONFIG_PRESET_1_NAME = _preset("preset_1", "sit", 750, DEFAULT_PRESET_1_NAME)
-CONFIG_PRESET_2, CONFIG_PRESET_2_NAME = _preset("preset_2", "stand", 1240, DEFAULT_PRESET_2_NAME)
+def load_desk(address):
+    """Makes the desk with this address the current one, with the settings
+    from its file and defaults for any it doesn't set. None is no desk."""
+    global CONFIG_UUID, CONFIG_PRESET_1, CONFIG_PRESET_1_NAME
+    global CONFIG_PRESET_2, CONFIG_PRESET_2_NAME, CONFIG_SHOW_HEIGHT
+    global CONFIG_AUTO_CONNECT, CONFIG_BASE_HEIGHT, CONNECTION_TIMEOUT
+    global MOVE_COMMAND_PERIOD, MIN_HEIGHT, MAX_HEIGHT
+    address = str(address) if address else None
+    desk = read_yaml(desk_file(address)) if address else {}
+    presets = desk.get("presets") or {}
 
-# Whether the current desk height is shown next to the menu bar icon.
-CONFIG_SHOW_HEIGHT: bool = bool(CONFIG.get("show_height", True))
+    CONFIG_UUID = address or PLACEHOLDER_UUID
+    CONFIG_PRESET_1, CONFIG_PRESET_1_NAME = _preset(presets, "preset_1", 750, DEFAULT_PRESET_1_NAME)
+    CONFIG_PRESET_2, CONFIG_PRESET_2_NAME = _preset(presets, "preset_2", 1240, DEFAULT_PRESET_2_NAME)
 
-CONFIG_AUTO_CONNECT: bool = bool(CONFIG.get("auto_connect", True))
+    CONFIG_SHOW_HEIGHT = bool(desk.get("show_height", True))
 
-# Height of the tabletop above ground at the lowest position (mm);
-# read from the desk controller during connect when unset.
-CONFIG_BASE_HEIGHT = CONFIG.get("base_height")
-CONNECTION_TIMEOUT: float = float(CONFIG.get("connection_timeout", 10))
-MOVE_COMMAND_PERIOD: float = float(CONFIG.get("move_command_period", 0.4))
+    CONFIG_AUTO_CONNECT = bool(desk.get("auto_connect", True))
 
-if CONFIG_BASE_HEIGHT:
-    MIN_HEIGHT = float(CONFIG_BASE_HEIGHT) / 10.0
-MAX_HEIGHT = float(CONFIG.get("max_height", 1270)) / 10.0
-if MAX_HEIGHT <= MIN_HEIGHT:
-    LOGGER.warning(
-        f"Nonsensical height limits in config "
-        f"({MIN_HEIGHT}cm-{MAX_HEIGHT}cm); using defaults"
-    )
-    MIN_HEIGHT = 62.0
-    MAX_HEIGHT = 127.0
+    # Height of the tabletop above ground at the lowest position (mm);
+    # read from the desk controller during connect when unset.
+    CONFIG_BASE_HEIGHT = desk.get("base_height")
+    CONNECTION_TIMEOUT = float(desk.get("connection_timeout", 10))
+    MOVE_COMMAND_PERIOD = float(desk.get("move_command_period", 0.4))
+
+    MIN_HEIGHT = float(CONFIG_BASE_HEIGHT) / 10.0 if CONFIG_BASE_HEIGHT else 62.0
+    MAX_HEIGHT = float(desk.get("max_height", 1270)) / 10.0
+    if MAX_HEIGHT <= MIN_HEIGHT:
+        LOGGER.warning(
+            f"Nonsensical height limits in config "
+            f"({MIN_HEIGHT}cm-{MAX_HEIGHT}cm); using defaults"
+        )
+        MIN_HEIGHT = 62.0
+        MAX_HEIGHT = 127.0
+
+
+load_desk(read_yaml(CONFIG_FILE_PATH).get("desk"))
 
 
 # --- UI Constants ---

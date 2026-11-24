@@ -5,7 +5,7 @@ This is what BLE browsers like Bluetility do to reveal a desk's address: an
 unfiltered CoreBluetooth scan. Desks are told apart by the Linak control
 service they advertise, or by LINAK A/S manufacturer data. A desk's address is
 its CoreBluetooth peripheral UUID, which is specific to this Mac and is what
-config.yaml stores as mac_address.
+config.yaml names the current desk by, and its settings file is named after.
 """
 import asyncio
 import logging
@@ -38,7 +38,7 @@ class BluetoothUnavailableError(Exception):
 @dataclass
 class DiscoveredDesk:
     """A desk seen by a scan. `paired` and `rssi` describe it at that time."""
-    address: str  # CoreBluetooth UUID, stored as the config's mac_address
+    address: str  # CoreBluetooth UUID, the key of the desk's settings
     name: str
     rssi: Optional[int] = None  # dBm; None when found already connected
     hardware_address: Optional[str] = None  # None when macOS won't tell

@@ -107,7 +107,7 @@ class InitialSetupView(NSView):
         uuid = self.uuid_field.stringValue()
         LOGGER.info(f"user provided UUID: {uuid}")
         LOGGER.debug("Trying initial setup connection")
-        config.ConfigParser.update(uuid)
+        config.ConfigParser.select_desk(uuid)
         self.app.desk.retry()
         self.app.checkAndUpdatePopover()
 

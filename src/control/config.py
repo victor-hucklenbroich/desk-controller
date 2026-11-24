@@ -1,3 +1,5 @@
+import os
+
 import yaml
 
 import constants
@@ -7,20 +9,29 @@ from constants import LOGGER
 class ConfigParser:
     @staticmethod
     def parse() -> dict:
-        with (open(constants.CONFIG_FILE_PATH) as stream):
-            try:
-                CONFIG = yaml.safe_load(stream)
-                return CONFIG or {}
-            except yaml.YAMLError as e:
-                LOGGER.warning(f"Error parsing config.yaml: {e}")
-                return {}
+        """The current desk's settings file."""
+        return constants.read_yaml(constants.desk_file(constants.CONFIG_UUID))
 
     @staticmethod
-    def update(uuid: str = "", preset_1: int = -1, preset_2: int = -1,
+    def select_desk(address: str):
+        """Makes the desk with this address the current one and loads its
+        settings, giving it a file with the defaults the first time."""
+        address = address.strip()
+        if not address or os.sep in address:
+            LOGGER.warning(f"Not a desk address: {address!r}")
+            return
+        path = constants.desk_file(address)
+        if not os.path.exists(path):
+            ConfigParser._write(path, constants.DEFAULT_DESK_CONFIG)
+            LOGGER.info(f"Created settings for desk {address}")
+        ConfigParser._write(constants.CONFIG_FILE_PATH, {"desk": address})
+        constants.load_desk(address)
+
+    @staticmethod
+    def update(preset_1: int = -1, preset_2: int = -1,
                preset_1_name: str = None, preset_2_name: str = None,
                show_height: bool = None, auto_connect: bool = None):
-        if uuid != "":
-            constants.CONFIG_UUID = uuid
+        """Changes the current desk's settings and saves them to its file."""
         if preset_1 != -1:
             constants.CONFIG_PRESET_1 = preset_1
         if preset_2 != -1:
@@ -39,8 +50,6 @@ class ConfigParser:
             constants.CONFIG_AUTO_CONNECT = auto_connect
 
         config = ConfigParser.parse()
-        config["mac_address"] = str(constants.CONFIG_UUID)
-        # Replaces the whole section, which also drops legacy "sit"/"stand" keys
         config["presets"] = {
             "preset_1": {
                 "name": str(constants.CONFIG_PRESET_1_NAME),
@@ -53,14 +62,18 @@ class ConfigParser:
         }
         config["show_height"] = bool(constants.CONFIG_SHOW_HEIGHT)
         config["auto_connect"] = bool(constants.CONFIG_AUTO_CONNECT)
-        with open(constants.CONFIG_FILE_PATH, 'w') as out:
-            yaml.safe_dump(config, out, default_flow_style=False)
-        LOGGER.info("Updated config.yaml with updated preferences")
+        ConfigParser._write(constants.desk_file(constants.CONFIG_UUID), config)
+        LOGGER.info(f"Saved the settings of desk {constants.CONFIG_UUID}")
 
     @staticmethod
     def update_max_height(max_height_mm: int):
         config = ConfigParser.parse()
         config["max_height"] = int(max_height_mm)
-        with open(constants.CONFIG_FILE_PATH, 'w') as out:
-            yaml.safe_dump(config, out, default_flow_style=False)
+        ConfigParser._write(constants.desk_file(constants.CONFIG_UUID), config)
         LOGGER.info(f"Persisted learned max height of {max_height_mm}mm")
+
+    @staticmethod
+    def _write(path: str, config: dict):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as out:
+            yaml.safe_dump(config, out, default_flow_style=False)
